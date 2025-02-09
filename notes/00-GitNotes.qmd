@@ -89,3 +89,51 @@ git rm -r --cached public
 ```
 
 
+## Stage and Unstage Files
+To stage (add files to be committed):
+
+```{sh}
+# adding the X.Y file
+git add X.Y
+
+# adding all files
+git add .
+```
+
+To unstage:
+```{sh}
+# unstaging the X.Y file
+git reset HEAD X.Y
+
+# unstaging all files
+git reset HEAD .
+
+```
+
+## Commit and Uncommit Files
+To commit the staged files:
+
+```{sh}
+git commit -m "Commit description"
+```
+
+To uncommit but leave the last committed files with staged files:
+```{sh}
+git reset --soft HEAD~1
+```
+
+To uncommit and unstage the file at the same time:
+```{sh}
+git reset HEAD~1
+```
+
+The above is equivalent to:
+```{sh}
+git reset --soft HEAD~1
+git reset HEAD .
+```
+
+> `git reset --hard HEAD~1` uncommits, unstages, and undone all the changes in files included in the last commit.
+
+> `git restore --staged X.Y` and `git restore X.Y` operate like `git reset --soft HEAD~1` and `git reset HEAD~1` but at a file level.
+
