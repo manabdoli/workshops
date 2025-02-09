@@ -1,0 +1,13 @@
+---
+title: "Alzd-Brain"
+format: html
+---
+
+https://neurolaunch.com/5-lobes-of-the-brain/
+
+Frontal Lobe: Responsible for executive functions, decision-making, and personality.
+Parietal Lobe: Involved in sensory processing and spatial awareness.
+Temporal Lobe: Associated with memory, language, and hearing.
+Occipital Lobe: Responsible for visual processing.
+Cerebellum (Little Brain): Responsible for physical coordination and maintaining balance.
+
