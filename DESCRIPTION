@@ -1,12 +1,11 @@
 Package: workshops
-Title: What the Package Does (One Line, Title Case)
+Title: Dr. Abdoli's Workshops
 Version: 0.0.0.9000
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: What the package does (one paragraph).
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-    license
+    person("Mansour", "Abdoli", , "mabdoli@fullerton.edu", role = c("aut", "cre"),
+           comment = c(ORCID = "https://orcid.org/0009-0001-6722-0134"))
+Description: This is a place where I will maitian a copy of codes and materials I use for different workshops.
+License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.1

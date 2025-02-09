@@ -51,3 +51,7 @@ rsconnect/
 .Rdata
 .DS_Store
 .quarto
+
+# Reproducible Files
+*.html
+*_files/
