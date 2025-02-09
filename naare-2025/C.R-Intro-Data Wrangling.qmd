@@ -1,0 +1,60 @@
+---
+title: "C. Intro to Data Wrangling using R"
+format: revealjs
+---
+
+## Statistical Process
+
+::: incremental
+::: columns
+::: {.column style="font-size: 85%"}
+-   Question
+    -   Parameter(s) of interest <br> ($\pi$, $\mu$, $\rho$)
+    -   Response/Explanatory variable(s)
+:::
+
+::: {.column style="font-size: 85%"}
+-   Data
+    - Sampling or Experiment Design
+    - Collecting Data
+    - **Data Wrangling**
+:::
+:::
+:::
+
+::: incremental
+::: columns
+::: {.column style="font-size: 85%"}
+-   Descriptive Analysis
+    -   **Visualizing**
+    -   Summarizing
+:::
+
+::: {.column style="font-size: 85%"}
+-   Inferential Analysis
+    -   **Modeling**
+    -   Generalizing and Predicting
+:::
+:::
+:::
+
+## Reading Local & Remote Files:
+
+```{r, echo=FALSE}
+x <- NACCdata::UDS[NACCdata::UDS$NACCVNUM==1,
+                   c('NACCID', 'NACCALZD', 'NACCAGE', 'SEX',
+                     'EDUC', 'BPSYS', 'BPDIAS')]
+set.seed(123)
+x <- x[sample.int(nrow(x), 2000), ]
+write.csv(x, file = 'NACC_Sample.csv', row.names = FALSE)
+
+```
+
+
+```{r, eval=FALSE}
+alz <- read.csv('https://drive.google.com/uc?export=download&id=1e_mA_i9-7dyGAb-SpeIS1OvimMi9HKU1')
+uds <- read.csv('https://drive.google.com/uc?export=download&id=1YQxENus9dc2k42-NPbngvH6qogzEyDqj')
+mri <- read.csv('https://drive.google.com/uc?export=download&id=10dJUNf1esACoP22BxMI9XI3r34ZDuu09')
+```
+
+

@@ -1,0 +1,94 @@
+---
+title: "Intro to R Programming"
+subtitle: "NACC Workshop"
+author: "Mansour Abdoli, PhD"
+date: "February 11, 2025"
+format: revealjs
+editor: source
+---
+
+## Programming Structure 
+
+:::: columns
+::: {.column .incremental style="font-size: .70em;"}
+
+- Input
+  - Read local or remote files
+  - Enter Data
+  - Use internal `R` Data
+
+- Process
+  - Summarize
+  - Visualize
+  - Analyze
+
+- Present & Record
+  - Readable
+  - Reproducible
+
+:::
+::: {.column} 
+```{mermaid}
+graph TD
+    A[(External Files)] --> C([Input])
+    B[\Keyboard/] --> C
+    C --> D{{Process<br>Program Scripts}}
+    D --> I((Internal data))
+    I --> C
+    D --> E([Output])
+    E --> F[/Display\]
+    E --> G[(Files)]
+```
+:::
+::::
+
+## Base `R` Programming 
+
+```{r, echo=TRUE}
+x <- c(1, 2, 5, 3, 1, 7) # Define a variable
+x.bar <- mean(x) # Compute the average of x
+print(x.bar)  # display the results
+```
+
+:::  {.incremental}
+-   Sequential Commands (Operations, Functions)
+-   Intermediate Variables
+-   Can get Complex and Messy
+  - Use Function!
+-   Good for Simple Tasks and Developing Functions
+
+:::
+
+## Piping[^1] (Tidyverse) Style Programming
+
+```{r, echo=TRUE}
+c(1, 2, 5, 3, 1, 7) |>  # Create the data and pass it on
+  mean() |>  # compute the mean and pass it on
+  print()  # display the results
+```
+
+:::  {.incremental}
+-   Chaining Commands
+-   No or fewer intermediate variables
+-   More Readable: (Heavy use of Functions!)
+-   Good for Complex Analysis
+:::
+
+
+[^1]: `|>` is supported in R 4.1.0 or higher. The original and more flexible piping is `%>%` and was introduced by `magrittr` package.
+
+
+## [Colab Code](https://colab.research.google.com/drive/1cisAWuE_W_Q6R9feHSjVUmOaz_HMYcqV#scrollTo=xSa2_2kJWu7w):
+
+- Programming Style
+  - Base R
+  - Piping Style
+- Code Maintenance
+  - REPL
+  - Script File (`.R`)
+  - Functions
+  - Publishing Tools
+  
+<div>
+  <img src="img/QRcode-B-ProgrammingIntro.png" style="position: absolute; bottom: 50px; right: 50px; width: 30%; height: 45%; z-index: 2;">
+</div>

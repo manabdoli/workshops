@@ -1,0 +1,324 @@
+---
+title: "Intro to R"
+subtitle: "NACC Workshop"
+author: "Mansour Abdoli, PhD"
+date: "February 11, 2025"
+format: revealjs
+editor: source
+---
+
+## R
+
+A free language and environment (software) for statistical computing and graphics([R-Project](r-project.org))
+
+::: incremental
+-   **Language:** Based on a well-developed language (`S`)
+
+-   **Environment:** Planned and coherent system of facilities
+
+    -   Data handling and storage,
+    -   Graphical tools, and
+    -   Data analysis
+:::
+
+## R Components (Simplified)
+
+```{mermaid}
+graph TD
+    A[Variables/Objects] --> B(Vectors)
+    B -- Basic Objects --> C[logical<br>character<br>integer<br>double<br>complex numbers<br>]
+    B --> D[Complex Data Structure]
+    B -- Operators<br>Functions --> E[<-, <<- &#40 assign &#41<br>&#91 &#93, &#91&#91 &#93&#93 &#40 subset &#41<br> +,-,*,/ &#40 math &#41<br>&#38, &#124, &#33 &#40 logical &#41<br>sum,mean,sd, plot &#40 functions &#41]
+    D -- Same Types<br>Higher Dimension --> D1[Matrix<br>&#40 2D &#41 <br><br>Array<br>&#40 3+D &#41]
+    D -- Different Types<br> and Dimensions --> D2[List<br><br>data frame<br> &#40 data table &#41 ]
+    C --> F(Base Packages<br>Standard Packages<br>Scripts<br>Other Packages)
+    D1 --> F
+    D2 --> F
+    E --> F
+```
+
+## Basic Objects
+
+:::: {.columns}
+::: {.column}
+### Code
+::: {style="font-size: .85em;"}
+
+```{r, echo=TRUE, eval=FALSE}
+# A Logical value
+TRUE
+# A Character
+'Name'
+# An Integer
+23L
+# A Double
+36.45
+# A Complex Number
+9.3+4.8i
+cat('-----\n') # A divider
+# An Operator
+`+`
+cat('-----\n') # A divider
+# A function
+sum
+```
+:::
+:::
+::: {.column}
+### Output
+::: {style="font-size: .85em;"}
+
+```{r}
+# A Logical value
+TRUE
+# A Character
+'Name'
+# An Integer
+23L
+# A Double
+36.45
+# A Complex Number
+9.3+4.8i
+
+cat('-----\n') # Adding a divider
+# An Operator
+`+`
+
+cat('-----\n') # Adding a divider
+# A function
+sum
+```
+:::
+:::
+::::
+
+## Everthing is a Vector
+
+:::: {.columns}
+::: {.column}
+### Code[^1]
+::: {style="font-size: .75em;"}
+```{r, echo=TRUE, eval=FALSE}
+# Vectors of length 1
+cat('Length of', 101, 'a numerical value:')
+length(101)
+cat('\n\tIts first element: ')
+101[1]
+cat('\n\tIts second element: ')
+101[2]
+cat('----------\n') # A divider
+cat('Length of "MyName", a character value:',
+    length('MyName'), '\n')
+cat('\tIts first element: ', 'MyName'[1])
+cat('\tNumbre of characters in "MyName" is:', 
+    nchar("MyName"))
+```
+:::
+:::
+::: {.column}
+### Output
+::: {style="font-size: .85em;"}
+
+```{r}
+# Vectors of length 1
+cat('Length of', 101, 'a numerical value:')
+length(101)
+cat('\n\tIts first element: ', 101[1])
+cat('\n\tIts second element: ', 101[2])
+cat('----------\n') # A divider
+cat('Length of "MyName", a character value:',
+    length('MyName'), '\n')
+cat('\tIts first element: ', 'MyName'[1])
+cat('\tNumbre of characters in "MyName" is:', 
+    nchar("MyName"))
+```
+:::
+:::
+::::
+
+[^1]: `R` commands can be written in multiple lines.
+
+## Creating Vectors
+
+:::: columns
+::: {.column}
+### Code
+::: {style="font-size: .75em;"}
+
+```{r, echo=TRUE, eval=FALSE}
+# Storing a Character Vectors into variable 'x'
+x <- c('A', 'character', 'vector')
+cat('`x` has', length(x), 'items.\n')
+cat('\tIts third item is "', x[3], '".\n')
+## Stop 'cat' from adding blanks
+cat('\tIts third item is "', x[3], '".\n', sep='')
+
+# Different ways of creating a Numerical Vector
+## Listing elements
+N1 <- c(1, 2.3, 45.6, 7.890)
+## Consecutive Sequence of Integers
+N2 <- -3:5
+## Equally-Distanced Sequence of Numbers
+N3 <- seq(-3, 15, 3)
+# printing values
+cat('\nValues of N1, N2, and N3:')
+N1
+N2
+print(N3)
+```
+:::
+:::
+::: column
+### Output
+
+```{r}
+# Storing a Character Vectors into variable 'x'
+x <- c('A', 'character', 'vector')
+cat('`x` has', length(x), 'items.\n')
+cat('\tIts third item is "', x[3], '".\n')
+## Stop 'cat' from adding blanks
+cat('\tIts third item is "', x[3], '".\n', sep='')
+
+# Different ways of creating a Numerical Vector
+## Listing elements
+N1 <- c(1, 2.3, 45.6, 7.890)
+## Consecutive Sequence of Integers
+N2 <- -3:5
+## Equally-Distanced Sequence of Numbers
+N3 <- seq(-3, 15, 3)
+# printing values
+cat('\nValues of N1, N2, and N3:')
+N1
+N2
+print(N3)
+```
+:::
+::::
+
+## Creating `list` objects
+
+::: columns
+::: {.column}
+### Code
+::: {style="font-size: .85em;"}
+
+```{r, echo=TRUE, eval=FALSE}
+# Creating a list
+aList <- list(Name = 'Mansour', 
+  Courses = c('M338','M335'),
+  NumUnits = c(5, 4))
+print(aList)
+cat('Number of elements:',
+    length(aList), '\n')
+cat('Type of aList:', 
+    typeof(aList), '\n')
+cat('Type of elements of aList:\n')
+sapply(aList, typeof)
+```
+:::
+:::
+::: {.column}
+### Output
+::: {style="font-size: .85em;"}
+
+```{r}
+# Creating a list
+aList <- list(Name = 'Mansour', 
+  Courses = c('M338','M335'),
+  NumUnits = c(5, 4))
+print(aList)
+cat('Number of elements:',
+    length(aList), '\n')
+cat('Type of aList:', 
+    typeof(aList), '\n')
+cat('Type of elements of aList:\n')
+sapply(aList, typeof)
+```
+:::
+:::
+:::
+  
+## Creating `data.frame` objects
+:::: columns
+::: column
+### Code[^2]
+::: {style="font-size: .85em;"}
+
+```{r, echo=TRUE, eval=FALSE}
+# Turning a list to a data.frame
+aDF <- as.data.frame(aList)
+print(aDF)
+cat('Number of elements:', length(aDF), '\n')
+cat('Type of aDF:', typeof(aDF), '\n')
+cat('Class of aDF:', class(aDF), '\n')
+cat('Dimension of aDF: ')
+dim(aDF)
+cat('Structure of aDF:')
+str(aDF)
+```
+:::
+:::
+
+::: column
+### Output
+::: {style="font-size: .85em;"}
+
+```{r}
+# Turning a list to a data.frame
+aDF <- as.data.frame(aList)
+print(aDF)
+cat('Number of elements:', length(aDF), '\n')
+cat('Type of aDF:', typeof(aDF), '\n')
+cat('Class of aDF:', class(aDF), '\n')
+cat('Dimension of aDF: ')
+dim(aDF)
+cat('Structure of aDF:')
+str(aDF)
+```
+:::
+:::
+::::
+[^2]: `dim()` is only defined for objects with two or more dimensions, like `data.frame`, `matrix`, and `array`.
+
+## R Packages
+
+As of January 2025:
+
+::: incremental
+-   Current Version: `4.4.2`
+    -   25 *base* and *standard* packages.
+-   Package Repositories:
+    -   21,925 packages on [CRAN](cran.r-project.org)
+    -   2,289 packages on [Bioconductor](bioconductor.org).
+:::
+
+## Programming Environment
+
+### Local Installations
+- Rscript, R's CLI (Command Line Interface)
+- R's Console or GUI (Graphical User Interface)
+- Rstudio(R) by Posit: [posit.co](https://posit.co/)
+- R kernel on Jupyter Notebook
+
+### Web-based/Claud-Based Interfaces
+- Posit Cloud: [posit.cloud](https://posit.cloud/)
+- Google's Colab: [colab.google](https://colab.google/)
+
+## VM on TCH: [fullerton.edu/it/tch](https://www.fullerton.edu/it/tch/)
+![](img/TitanComputingHub.png)
+<div>
+  <img src="img/QRcode-TCH.png" style="position: absolute; bottom: 50px; right: 50px; width: 30%; height: 45%; z-index: 2;">
+</div>
+
+## Rstudio Interface
+![](img/Rstudio.png)
+
+## Intro to R Codes on Colab
+[A.R-Intro.jpynb](https://colab.research.google.com/drive/1PnEUb8FlkFtyCcYRLFNX2R3Xnw8UrvMl?usp=sharing)
+
+<div>
+  <img src="img/colab.png" style="position: absolute; bottom: 0; left: 0; width: 100%; height: 78%; z-index: 1;">
+  <img src="img/QRcode-Colab_A.R-Intro.png" style="position: absolute; bottom: 50px; right: 100px; width: 30%; height: 45%; z-index: 2;">
+</div>
+
+
