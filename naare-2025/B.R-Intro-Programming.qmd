@@ -51,10 +51,11 @@ print(x.bar)  # display the results
 ```
 
 :::  {.incremental}
+
 -   Sequential Commands (Operations, Functions)
 -   Intermediate Variables
 -   Can get Complex and Messy
-  - Use Function!
+    - Use Function!
 -   Good for Simple Tasks and Developing Functions
 
 :::

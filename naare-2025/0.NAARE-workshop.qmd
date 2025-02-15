@@ -12,7 +12,6 @@ editor: source
 - Aging, AD, and NACC Data
 - Intro to R
 - Intro to Programming in R
-- Intro to Data Wrangling in R
 
 ## Pre-Workshop Survey
 
@@ -22,7 +21,6 @@ editor: source
 
 - [Intro to `R`](file:///Users/mabdoli/Documents/GitHub/workshops/naare-2025/A.R-Intro-System.html#/title-slide){target="_blank"}
 - [Intro to Programming in `R`](file:///Users/mabdoli/Documents/GitHub/workshops/naare-2025/B.R-Intro-Programming.html#/title-slide){target="_blank"}
-- [NACC UDS Data](file:///Users/mabdoli/Documents/GitHub/workshops/naare-2025/C.NACC-UDS-Data.html#/title-slide){target="_blank"}
 
 ## Day 1 Survey
 

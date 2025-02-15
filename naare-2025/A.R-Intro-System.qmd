@@ -26,7 +26,7 @@ A free language and environment (software) for statistical computing and graphic
 ```{mermaid}
 graph TD
     A[Variables/Objects] --> B(Vectors)
-    B -- Basic Objects --> C[logical<br>character<br>integer<br>double<br>complex numbers<br>]
+    B -- Atomic Objects --> C[logical<br>character<br>integer<br>double<br>complex numbers<br>]
     B --> D[Complex Data Structure]
     B -- Operators<br>Functions --> E[<-, <<- &#40 assign &#41<br>&#91 &#93, &#91&#91 &#93&#93 &#40 subset &#41<br> +,-,*,/ &#40 math &#41<br>&#38, &#124, &#33 &#40 logical &#41<br>sum,mean,sd, plot &#40 functions &#41]
     D -- Same Types<br>Higher Dimension --> D1[Matrix<br>&#40 2D &#41 <br><br>Array<br>&#40 3+D &#41]
