@@ -1,0 +1,26 @@
+---
+title: "NAARE Workshop"
+subtitle: "Main Slides"
+author: "Mansour Abdoli, PhD"
+date: "February 11, 2025"
+format: revealjs
+editor: source
+---
+
+## Day 1 
+
+- [Intro to `R`](A.R-Intro-System.html#/title-slide){target="_blank"}
+- [Intro to Programming in `R`](B.R-Intro-Programming.html#/title-slide){target="_blank"}
+
+## Day 2
+- [Intro to Programming in `R`](B.R-Intro-Programming.html#/title-slide){target="_blank"}
+- [NACC UDS Data](C.NACC-UDS-Data.html#/title-slide){target="_blank"}
+- [Discovering Associations](D.Discovering%20Associations.html#/title-slide){target="_blank"}
+
+
+## Day 3
+- [Discovering Associations](D.Discovering%20Associations.html#/title-slide){target="_blank"}
+
+- [Prediction in UDS](https://colab.research.google.com/drive/1PjyMUEH8F9gsGwV89EILApbqaF3h6Lq7?usp=sharing){target="_blank"}
+
+- [Joining UDS and MRI](https://colab.research.google.com/drive/14FV7NcXeSsS4ZEx9aeZAH-or-oQgW_lz?usp=sharing){target="_blank"}
