@@ -1,0 +1,44 @@
+---
+title: "NAARE Workshop"
+subtitle: "Day 3"
+author: "Mansour Abdoli, PhD"
+date: "February 18, 2025"
+format: revealjs
+editor: source
+---
+
+## Day 3 Agenda
+- [Discovering Associations](file:///Users/mabdoli/Documents/GitHub/workshops/naare-2025/D.Discovering%20Associations.html#/title-slide){target="_blank"}
+
+- [Prediction in UDS](https://colab.research.google.com/drive/1PjyMUEH8F9gsGwV89EILApbqaF3h6Lq7?usp=sharing){target="_blank"}
+
+- [Joining UDS and MRI](https://colab.research.google.com/drive/14FV7NcXeSsS4ZEx9aeZAH-or-oQgW_lz?usp=sharing){target="_blank"}
+
+## Day 3 Agenda
+- [Discovering Associations](file:///Users/mabdoli/Documents/GitHub/workshops/naare-2025/D.Discovering%20Associations.html#/title-slide){target="_blank"}
+
+- [Prediction in UDS: tinyurl.com/NAARE25-Prediction](https://colab.research.google.com/drive/1PjyMUEH8F9gsGwV89EILApbqaF3h6Lq7?usp=sharing){target="_blank"}
+
+- [Joining UDS and MRI](https://colab.research.google.com/drive/14FV7NcXeSsS4ZEx9aeZAH-or-oQgW_lz?usp=sharing){target="_blank"}
+
+<div>
+  <img src="img/QRcode_E-Prediction.png" style="position: absolute; top: 30%; right: -10px; width: 30%; height: 45%; z-index: 2;">
+</div>
+
+
+## Day 3 Agenda
+- [Discovering Associations](file:///Users/mabdoli/Documents/GitHub/workshops/naare-2025/D.Discovering%20Associations.html#/title-slide){target="_blank"}
+
+- [Prediction in UDS](https://colab.research.google.com/drive/1PjyMUEH8F9gsGwV89EILApbqaF3h6Lq7?usp=sharing){target="_blank"}
+
+- [Joining UDS and MRI: tinyurl.com/NAARE25-USD-MRI](https://colab.research.google.com/drive/14FV7NcXeSsS4ZEx9aeZAH-or-oQgW_lz?usp=sharing){target="_blank"}
+
+<div>
+  <img src="img/QRcode_UDS-MRI.png" style="position: absolute; top: 40%; right: -10px; width: 30%; height: 45%; z-index: 2;">
+</div>
+
+
+
+## [Day 3 Survey](https://www.mentimeter.com/app/presentation/bltmpiu6ctg2fzptpvqj8eus2bsrsz67/present?question=7ntdpmi184fe)
+
+<div style='position: relative; padding-bottom: 56.25%; padding-top: 35px; height: 0; overflow: hidden;'><iframe sandbox='allow-scripts allow-same-origin allow-presentation' allowfullscreen='true' allowtransparency='true' frameborder='0' height='315' src='https://www.mentimeter.com/app/presentation/bltmpiu6ctg2fzptpvqj8eus2bsrsz67/embed' style='position: absolute; top: 0; left: 0; width: 100%; height: 100%;' width='420'></iframe></div>
