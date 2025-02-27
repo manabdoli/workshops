@@ -107,7 +107,14 @@ git reset HEAD X.Y
 
 # unstaging all files
 git reset HEAD .
+# or
+git reset HEAD .
 
+```
+
+To discard all changes:
+```{sh}
+git checkout .
 ```
 
 ## Commit and Uncommit Files
