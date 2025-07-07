@@ -1,0 +1,327 @@
+---
+title: "GitWorkflow-Claude"
+format: html
+editor: visual
+---
+
+I'll break down both Git workflow approaches for you, covering the pros, cons, and essential commands for each.
+
+## Approach 1: Develop on Main, Deploy from Separate Branch
+
+**Workflow**: Development happens on `main` → Changes pushed to deployment branch (e.g., `production`, `gh-pages`)
+
+### Pros:
+- Simple mental model - main branch is always your current development state
+- Easy to understand what's currently being worked on
+- No merge conflicts between development branches
+- Straightforward for solo developers or small teams
+- Main branch remains the single source of truth for active development
+
+### Cons:
+- Main branch may contain unstable/untested code
+- Deployment branch can diverge from main if hotfixes are applied directly
+- Harder to maintain multiple versions or releases
+- Limited ability to isolate features during development
+- Deployment branch becomes a "dumping ground" that's harder to track
+
+### Key Commands:
+```bash
+# Daily development
+git add .
+git commit -m "Feature: add new functionality"
+git push origin main
+
+# Deploy to production branch
+git checkout production
+git merge main
+git push origin production
+
+# Or force push if you want production to exactly match main
+git checkout production
+git reset --hard main
+git push --force-with-lease origin production
+
+# Create deployment branch initially
+git checkout -b production
+git push -u origin production
+```
+
+## Approach 2: Develop in Feature Branches, Main as Deployment
+
+**Workflow**: Development happens in feature branches → Merged to `main` → Main used for deployment
+
+### Pros:
+- Main branch stays stable and deployment-ready
+- Better code review process through pull requests
+- Easy to isolate and test features independently
+- Can easily revert problematic changes
+- Supports multiple developers working simultaneously
+- Main branch represents the current production state
+- Better for CI/CD pipelines
+
+### Cons:
+- More complex workflow, especially for beginners
+- Requires discipline to keep branches up to date
+- Potential for merge conflicts when integrating branches
+- Need to manage branch lifecycle (creation, merging, deletion)
+- May slow down development for small, quick changes
+
+### Key Commands:
+```bash
+# Create and switch to feature branch
+git checkout -b feature/new-feature
+# or
+git switch -c feature/new-feature
+
+# Daily development on feature branch
+git add .
+git commit -m "Add new feature component"
+git push origin feature/new-feature
+
+# Keep feature branch updated with main
+git checkout main
+git pull origin main
+git checkout feature/new-feature
+git merge main
+# or rebase: git rebase main
+
+# Merge feature to main (after code review)
+git checkout main
+git pull origin main
+git merge feature/new-feature
+git push origin main
+
+# Clean up feature branch
+git branch -d feature/new-feature
+git push origin --delete feature/new-feature
+
+# Deploy main branch
+# (This happens automatically if main is connected to deployment)
+```
+
+## Recommendations by Use Case:
+
+**Choose Approach 1 (Develop on Main) when:**
+- Solo developer or very small team
+- Simple projects with infrequent releases
+- Static websites or documentation
+- You need rapid prototyping without formal review processes
+
+**Choose Approach 2 (Feature Branches) when:**
+- Multiple developers
+- Need code review processes
+- Continuous integration/deployment
+- R packages, libraries, or software with versioned releases
+- Want to maintain stable main branch for production
+
+## Hybrid Approach:
+Some teams use a combination: develop in feature branches for major features, but allow small fixes directly on main, with main always being deployment-ready.
+
+For R packages specifically, Approach 2 is generally preferred because CRAN and package repositories expect stable releases, and the main branch often needs to pass comprehensive tests before deployment.
+
+
+# Versioning
+
+Managing versions in R packages requires a systematic approach using Git tags, branches, and proper semantic versioning. Here's a comprehensive workflow:
+
+## Version Management Strategy
+
+### Semantic Versioning for R Packages
+R packages typically follow semantic versioning: `MAJOR.MINOR.PATCH`
+- **MAJOR**: Breaking changes, incompatible API changes
+- **MINOR**: New features, backward-compatible functionality
+- **PATCH**: Bug fixes, backward-compatible fixes
+
+Development versions often include `.9000` (e.g., `1.2.0.9000`) to indicate in-development code.
+
+## Git Workflow for Version Management
+
+### Main Branch Strategy
+```bash
+# Main branch contains current development
+# Tagged commits represent releases
+main (1.3.0.9000) ← current development
+  ↓
+  v1.2.0 (tag) ← latest release
+  ↓
+  v1.1.0 (tag) ← previous release
+  ↓
+  v1.0.0 (tag) ← initial release
+```
+
+### Release Workflow
+
+#### 1. Preparing a New Release
+```bash
+# Ensure you're on main and up to date
+git checkout main
+git pull origin main
+
+# Update version in DESCRIPTION file
+# Change from 1.2.0.9000 to 1.2.0
+# Also update NEWS.md with changes
+
+# Update documentation and run checks
+devtools::document()
+devtools::check()
+
+# Commit version bump
+git add DESCRIPTION NEWS.md man/
+git commit -m "Release version 1.2.0"
+
+# Create and push tag
+git tag -a v1.2.0 -m "Release version 1.2.0"
+git push origin main
+git push origin v1.2.0
+```
+
+#### 2. Post-Release Development Setup
+```bash
+# Immediately bump to next development version
+# Change DESCRIPTION from 1.2.0 to 1.2.0.9000
+git add DESCRIPTION
+git commit -m "Bump development version to 1.2.0.9000"
+git push origin main
+```
+
+## Managing Multiple Versions
+
+### Option 1: Release Branches (Recommended for Long-term Support)
+```bash
+# Create release branch for long-term maintenance
+git checkout v1.2.0
+git checkout -b release/1.2.x
+git push -u origin release/1.2.x
+
+# For hotfixes to 1.2.x series
+git checkout release/1.2.x
+# Make fixes, update to 1.2.1
+git commit -m "Fix critical bug for v1.2.1"
+git tag -a v1.2.1 -m "Release version 1.2.1"
+git push origin release/1.2.x
+git push origin v1.2.1
+
+# Merge hotfix back to main if needed
+git checkout main
+git merge release/1.2.x
+```
+
+### Option 2: Tag-Only Approach (Simpler)
+```bash
+# Keep only tags for releases
+# Use tags to access specific versions
+git checkout v1.1.0  # Access old version
+git checkout v1.2.0  # Access current version
+git checkout main    # Back to development
+```
+
+## R Package Specific Commands
+
+### Using devtools for Version Management
+```r
+# Check current version
+devtools::session_info()
+
+# Update version number
+usethis::use_version()  # Interactive version bumping
+
+# Prepare for release
+devtools::release()  # Runs checks and asks confirmation
+
+# Submit to CRAN
+devtools::release(check = TRUE)
+```
+
+### DESCRIPTION File Management
+```r
+# The DESCRIPTION file should be updated for each release
+Package: YourPackage
+Version: 1.2.0        # Remove .9000 for release
+Date: 2024-01-15
+```
+
+## Complete Release Workflow Example
+
+```bash
+# 1. Feature development (on main)
+git checkout main
+git pull origin main
+# Develop features...
+git commit -m "Add new feature X"
+
+# 2. Prepare for release
+# Update DESCRIPTION: 1.1.0.9000 → 1.2.0
+# Update NEWS.md
+# Run R CMD check
+R CMD check .
+
+# 3. Release commit
+git add DESCRIPTION NEWS.md
+git commit -m "Release version 1.2.0"
+
+# 4. Tag release
+git tag -a v1.2.0 -m "Release version 1.2.0
+
+New features:
+- Feature X added
+- Bug fixes in Y
+
+Breaking changes:
+- Function Z deprecated"
+
+# 5. Push release
+git push origin main
+git push origin v1.2.0
+
+# 6. Bump development version
+# Update DESCRIPTION: 1.2.0 → 1.2.0.9000
+git add DESCRIPTION
+git commit -m "Bump development version to 1.2.0.9000"
+git push origin main
+
+# 7. Create release branch if needed for LTS
+git checkout v1.2.0
+git checkout -b release/1.2.x
+git push -u origin release/1.2.x
+```
+
+## Making Old Versions Available
+
+### For Package Users
+```r
+# Install specific version from GitHub
+devtools::install_github("username/package@v1.1.0")
+
+# Or using remotes
+remotes::install_github("username/package@v1.1.0")
+```
+
+### For CRAN Packages
+```r
+# CRAN archive (if package was on CRAN)
+devtools::install_version("package", version = "1.1.0")
+```
+
+### Creating Release Archives
+```bash
+# Create source package from tag
+git checkout v1.2.0
+R CMD build .
+# Creates YourPackage_1.2.0.tar.gz
+
+# Store in releases/ directory
+mkdir -p releases
+mv YourPackage_1.2.0.tar.gz releases/
+```
+
+## Best Practices
+
+1. **Always tag releases** - Tags are immutable reference points
+2. **Use semantic versioning** - Makes dependency management easier
+3. **Maintain NEWS.md** - Document changes for users
+4. **Run comprehensive tests** before tagging
+5. **Consider LTS branches** for packages with enterprise users
+6. **Automate with GitHub Actions** for consistent releases
+7. **Never force-push tags** - They should be permanent references
+
+This workflow ensures you can maintain multiple versions while keeping development moving forward on the main branch.
