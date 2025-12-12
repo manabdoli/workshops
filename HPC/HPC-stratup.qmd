@@ -1,0 +1,517 @@
+---
+title: "HPC Testing Guide: R, Python, MATLAB, and Julia"
+format: html
+---
+
+
+## 1. Environment Setup Tests
+
+### Python Environment
+```bash
+# Load Python module
+module load python/3.11  # adjust version as needed
+
+# Create virtual environment
+python -m venv ~/hpc_test_env
+source ~/hpc_test_env/bin/activate
+
+# Install test packages
+pip install numpy scipy pandas scikit-learn torch joblib mpi4py
+```
+
+### R Environment
+```bash
+# Load R module
+module load r/4.3  # adjust version
+
+# Install packages (in R console)
+R
+```
+```r
+install.packages(c("parallel", "doParallel", "foreach", "Rmpi"), 
+                 repos="https://cloud.r-project.org")
+```
+
+### Julia Environment
+```bash
+# Load Julia module
+module load julia/1.10  # adjust version
+
+# Install packages
+julia -e 'using Pkg; Pkg.add(["Distributed", "SharedArrays", "MPI", "CUDA"])'
+```
+
+### MATLAB Setup
+```bash
+# MATLAB is typically pre-installed on HPC
+module load matlab/R2023b  # adjust version
+```
+
+---
+
+## 2. CPU Multi-core Tests
+
+### Python: CPU Test (test_python_cpu.py)
+```python
+import numpy as np
+import time
+from joblib import Parallel, delayed
+from multiprocessing import cpu_count
+
+def compute_task(n):
+    """CPU-intensive task: matrix operations"""
+    A = np.random.rand(1000, 1000)
+    B = np.random.rand(1000, 1000)
+    return np.linalg.eigvals(A @ B)
+
+def test_parallel(n_jobs):
+    start = time.time()
+    results = Parallel(n_jobs=n_jobs)(
+        delayed(compute_task)(i) for i in range(48)
+    )
+    elapsed = time.time() - start
+    print(f"Jobs={n_jobs}, Time={elapsed:.2f}s, Speedup={elapsed_1/elapsed:.2f}x")
+    return elapsed
+
+if __name__ == "__main__":
+    print(f"CPUs available: {cpu_count()}")
+    
+    # Baseline
+    elapsed_1 = test_parallel(1)
+    
+    # Test scaling
+    for n in [2, 4, 8, 16, 32]:
+        test_parallel(n)
+```
+
+### R: CPU Test (test_r_cpu.R)
+```r
+library(parallel)
+library(doParallel)
+library(foreach)
+
+# Detect cores
+n_cores <- detectCores()
+cat("Cores available:", n_cores, "\n")
+
+# CPU-intensive function
+compute_task <- function(i) {
+  A <- matrix(rnorm(1000*1000), 1000, 1000)
+  B <- matrix(rnorm(1000*1000), 1000, 1000)
+  eigen(A %*% B, only.values = TRUE)$values
+}
+
+# Test function
+test_parallel <- function(n_cores_use) {
+  cl <- makeCluster(n_cores_use)
+  registerDoParallel(cl)
+  
+  start_time <- Sys.time()
+  results <- foreach(i = 1:48) %dopar% {
+    compute_task(i)
+  }
+  elapsed <- as.numeric(Sys.time() - start_time, units = "secs")
+  
+  stopCluster(cl)
+  
+  cat(sprintf("Cores=%d, Time=%.2fs\n", n_cores_use, elapsed))
+  return(elapsed)
+}
+
+# Run tests
+elapsed_1 <- test_parallel(1)
+for (n in c(2, 4, 8, 16, 32)) {
+  test_parallel(n)
+}
+```
+
+### Julia: CPU Test (test_julia_cpu.jl)
+```julia
+using Distributed
+using LinearAlgebra
+using Statistics
+
+function compute_task(i)
+    A = rand(1000, 1000)
+    B = rand(1000, 1000)
+    eigvals(A * B)
+end
+
+function test_parallel(n_workers)
+    if n_workers > 1
+        addprocs(n_workers - 1)
+        @everywhere using LinearAlgebra
+    end
+    
+    start_time = time()
+    results = pmap(compute_task, 1:48)
+    elapsed = time() - start_time
+    
+    println("Workers=$n_workers, Time=$(round(elapsed, digits=2))s")
+    
+    if n_workers > 1
+        rmprocs(workers())
+    end
+    
+    return elapsed
+end
+
+println("Testing Julia parallel scaling...")
+for n in [1, 2, 4, 8, 16, 32]
+    test_parallel(n)
+end
+```
+
+### MATLAB: CPU Test (test_matlab_cpu.m)
+```matlab
+function test_matlab_cpu()
+    % Test parallel pool
+    n_cores = feature('numcores');
+    fprintf('Cores available: %d\n', n_cores);
+    
+    % Baseline (no parallel)
+    tic;
+    for i = 1:48
+        compute_task(i);
+    end
+    time_serial = toc;
+    fprintf('Serial: %.2fs\n', time_serial);
+    
+    % Test with parpool
+    for n = [2, 4, 8, 16, 32]
+        if n <= n_cores
+            delete(gcp('nocreate'));
+            parpool(n);
+            
+            tic;
+            parfor i = 1:48
+                compute_task(i);
+            end
+            time_parallel = toc;
+            
+            fprintf('Cores=%d, Time=%.2fs, Speedup=%.2fx\n', ...
+                    n, time_parallel, time_serial/time_parallel);
+            
+            delete(gcp('nocreate'));
+        end
+    end
+end
+
+function result = compute_task(i)
+    A = rand(1000, 1000);
+    B = rand(1000, 1000);
+    result = eig(A * B);
+end
+```
+
+---
+
+## 3. GPU Tests
+
+### Python: GPU Test (test_python_gpu.py)
+```python
+import torch
+import time
+import numpy as np
+
+def test_gpu():
+    if not torch.cuda.is_available():
+        print("No GPU available!")
+        return
+    
+    device = torch.device("cuda:0")
+    print(f"GPU: {torch.cuda.get_device_name(0)}")
+    print(f"Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+    
+    # CPU test
+    size = 10000
+    A_cpu = torch.randn(size, size)
+    B_cpu = torch.randn(size, size)
+    
+    start = time.time()
+    C_cpu = torch.matmul(A_cpu, B_cpu)
+    cpu_time = time.time() - start
+    
+    # GPU test
+    A_gpu = A_cpu.to(device)
+    B_gpu = B_cpu.to(device)
+    torch.cuda.synchronize()
+    
+    start = time.time()
+    C_gpu = torch.matmul(A_gpu, B_gpu)
+    torch.cuda.synchronize()
+    gpu_time = time.time() - start
+    
+    print(f"CPU time: {cpu_time:.3f}s")
+    print(f"GPU time: {gpu_time:.3f}s")
+    print(f"Speedup: {cpu_time/gpu_time:.2f}x")
+
+if __name__ == "__main__":
+    test_gpu()
+```
+
+### Julia: GPU Test (test_julia_gpu.jl)
+```julia
+using CUDA
+using LinearAlgebra
+using BenchmarkTools
+
+function test_gpu()
+    if !CUDA.functional()
+        println("No GPU available!")
+        return
+    end
+    
+    println("GPU: $(CUDA.name(CUDA.device()))")
+    
+    # CPU test
+    size = 10000
+    A_cpu = rand(Float32, size, size)
+    B_cpu = rand(Float32, size, size)
+    
+    cpu_time = @elapsed C_cpu = A_cpu * B_cpu
+    
+    # GPU test
+    A_gpu = CuArray(A_cpu)
+    B_gpu = CuArray(B_cpu)
+    
+    # Warmup
+    C_gpu = A_gpu * B_gpu
+    CUDA.synchronize()
+    
+    gpu_time = @elapsed begin
+        C_gpu = A_gpu * B_gpu
+        CUDA.synchronize()
+    end
+    
+    println("CPU time: $(round(cpu_time, digits=3))s")
+    println("GPU time: $(round(gpu_time, digits=3))s")
+    println("Speedup: $(round(cpu_time/gpu_time, digits=2))x")
+end
+
+test_gpu()
+```
+
+---
+
+## 4. SLURM Job Scripts
+
+### Python CPU Job (submit_python_cpu.sh)
+```bash
+#!/bin/bash
+#SBATCH --job-name=py_cpu_test
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=32
+#SBATCH --time=00:30:00
+#SBATCH --mem=64G
+#SBATCH --output=python_cpu_%j.out
+
+module load python/3.11
+source ~/hpc_test_env/bin/activate
+
+# Set threading environment
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+export MKL_NUM_THREADS=$SLURM_CPUS_PER_TASK
+
+python test_python_cpu.py
+```
+
+### Python GPU Job (submit_python_gpu.sh)
+```bash
+#!/bin/bash
+#SBATCH --job-name=py_gpu_test
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --gres=gpu:1
+#SBATCH --time=00:15:00
+#SBATCH --mem=16G
+#SBATCH --output=python_gpu_%j.out
+
+module load python/3.11
+module load cuda/12.1
+source ~/hpc_test_env/bin/activate
+
+python test_python_gpu.py
+```
+
+### R CPU Job (submit_r_cpu.sh)
+```bash
+#!/bin/bash
+#SBATCH --job-name=r_cpu_test
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=32
+#SBATCH --time=00:30:00
+#SBATCH --mem=64G
+#SBATCH --output=r_cpu_%j.out
+
+module load r/4.3
+
+# R respects SLURM_CPUS_PER_TASK automatically
+Rscript test_r_cpu.R
+```
+
+### Julia CPU Job (submit_julia_cpu.sh)
+```bash
+#!/bin/bash
+#SBATCH --job-name=julia_cpu_test
+#SBATCH --nodes=1
+#SBATCH --ntasks=32
+#SBATCH --cpus-per-task=1
+#SBATCH --time=00:30:00
+#SBATCH --mem=64G
+#SBATCH --output=julia_cpu_%j.out
+
+module load julia/1.10
+
+export JULIA_NUM_THREADS=$SLURM_NTASKS
+
+julia test_julia_cpu.jl
+```
+
+### Julia GPU Job (submit_julia_gpu.sh)
+```bash
+#!/bin/bash
+#SBATCH --job-name=julia_gpu_test
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --gres=gpu:1
+#SBATCH --time=00:15:00
+#SBATCH --mem=16G
+#SBATCH --output=julia_gpu_%j.out
+
+module load julia/1.10
+module load cuda/12.1
+
+julia test_julia_gpu.jl
+```
+
+### MATLAB CPU Job (submit_matlab_cpu.sh)
+```bash
+#!/bin/bash
+#SBATCH --job-name=matlab_cpu_test
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=32
+#SBATCH --time=00:30:00
+#SBATCH --mem=64G
+#SBATCH --output=matlab_cpu_%j.out
+
+module load matlab/R2023b
+
+# Run MATLAB in batch mode
+matlab -nodisplay -nosplash -batch "test_matlab_cpu"
+```
+
+---
+
+## 5. Key Considerations by Language
+
+### Python
+- **CPU**: Use `joblib`, `multiprocessing`, or `concurrent.futures`
+- **Multi-node**: Use `mpi4py` with `--ntasks > 1`
+- **GPU**: PyTorch/TensorFlow handle GPU automatically
+- **Environment**: Set `OMP_NUM_THREADS`, `MKL_NUM_THREADS`
+
+### R
+- **CPU**: Use `parallel`, `doParallel`, `foreach`
+- **Cores**: R automatically detects `SLURM_CPUS_PER_TASK`
+- **GPU**: Limited support; use `gpuR` or call Python via `reticulate`
+- **Memory**: R loads data into memory; request sufficient RAM
+
+### Julia
+- **CPU**: Use `Distributed`, `SharedArrays`, or `Threads`
+- **Multi-node**: Use `MPI.jl` or distributed workers
+- **GPU**: `CUDA.jl` provides excellent GPU support
+- **Environment**: Set `JULIA_NUM_THREADS`
+
+### MATLAB
+- **CPU**: Use `parfor` with parallel pool
+- **Cores**: Specify with `parpool(n)`
+- **GPU**: Use `gpuArray` for GPU computations
+- **License**: Check concurrent license availability on HPC
+
+---
+
+## 6. Submission and Monitoring
+
+```bash
+# Submit jobs
+sbatch submit_python_cpu.sh
+sbatch submit_python_gpu.sh
+sbatch submit_r_cpu.sh
+sbatch submit_julia_cpu.sh
+sbatch submit_julia_gpu.sh
+sbatch submit_matlab_cpu.sh
+
+# Monitor jobs
+squeue -u $USER
+
+# Check job details
+scontrol show job <job_id>
+
+# View output
+tail -f python_cpu_<job_id>.out
+
+# Cancel job
+scancel <job_id>
+```
+
+---
+
+## 7. Quick Checklist
+
+- [ ] Modules loaded correctly for each language
+- [ ] Virtual environments created (Python/Julia)
+- [ ] Packages installed
+- [ ] CPU tests show speedup with more cores
+- [ ] GPU tests run and show speedup vs CPU
+- [ ] SLURM scripts submit successfully
+- [ ] Output files created
+- [ ] No "out of memory" errors
+- [ ] License issues resolved (MATLAB)
+
+---
+
+## Tips for Optimization
+
+1. **Start small**: Test with small datasets first
+2. **Check scaling**: Compare 1, 2, 4, 8, 16, 32 cores
+3. **Memory**: Request 2-4 GB per core as baseline
+4. **Time limits**: Start conservative, adjust based on results
+5. **GPU memory**: Check with `nvidia-smi` in job script
+6. **Node exclusivity**: Use `--exclusive` for benchmarking
+7. **Debug**: Use `--qos=debug` or similar for quick tests
+
+
+---
+# Overview:
+
+Environment Setup - Commands to load modules and install necessary packages for each language
+CPU Multi-core Tests - Working test scripts for Python, R, Julia, and MATLAB that:
+
+Test parallel scaling from 1 to 32 cores
+Perform CPU-intensive matrix operations
+Measure speedup and efficiency
+
+
+GPU Tests - Scripts for Python and Julia to test GPU vs CPU performance
+SLURM Job Scripts - Ready-to-use submission scripts with proper resource requests for each test
+Language-Specific Guidance - Key considerations for parallelization in each language
+
+## Quick Start:
+
+Save the test scripts from the artifact
+Adjust module names/versions to match your HPC (module avail to check)
+Submit a simple test: sbatch submit_python_cpu.sh
+Monitor: squeue -u $USER
+Check results in the output files
+
+## What to Look For:
+
+Linear speedup: 2x cores ≈ 2x faster (ideal)
+Good speedup: 2x cores = 1.5-1.8x faster (typical)
+Poor speedup: No improvement (indicates issues)
