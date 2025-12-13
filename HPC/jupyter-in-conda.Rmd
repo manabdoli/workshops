@@ -1,0 +1,79 @@
+---
+title: "Using Jupyter Notebook with Anaconda Environment"
+format: html
+execute:
+  engine: knitr
+---
+
+```{r, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
+```
+
+Jupyter Notebook can be seamlessly integrated with Conda environments to ensure isolated and reproducible workflows. Below are the steps to set up and use Jupyter Notebook within a Conda environment.
+
+## Step 1: Create a Conda Environment
+
+Create a new environment with the desired Python version:
+```{bash, eval=FALSE}
+conda create -n my_env python=3.8
+```
+
+Activate the environment:
+```{bash, eval=FALSE}
+conda activate my_env
+```
+
+## Step 2: Install Jupyter Notebook
+With the environment activated, install Jupyter Notebook:
+```{bash, eval=FALSE}
+conda install jupyter
+```
+
+Alternatively, you can install JupyterLab (an advanced interface):
+
+```{bash, eval=FALSE}
+conda install jupyterlab
+```
+
+## Step 3: Launch Jupyter Notebook
+Start the Jupyter Notebook server from the activated environment:
+
+```{bash, eval=FALSE}
+jupyter notebook
+```
+
+This will open the Jupyter interface in your default web browser. If it doesn’t, copy the URL displayed in the terminal and paste it into your browser.
+
+## Step 4: Add Environment as a Kernel (Optional)
+
+To use this environment as a kernel in Jupyter:
+
+Install ipykernel in your environment:
+
+```{bash, eval=FALSE}
+conda install ipykernel
+```
+
+Add the environment to Jupyter:
+
+```{bash, eval=FALSE}
+python -m ipykernel install --user --name=my_env --display-name "Python (my_env)"
+```
+
+## Best Practices
+
+- Use conda to install packages whenever possible for compatibility.
+
+- Export your environment for reproducibility:
+
+```{bash, eval=FALSE}
+conda env export > environment.yml
+```
+
+Recreate environments using:
+
+```{bash, eval=FALSE}
+conda env create -f environment.yml
+```
+
+By following these steps, you can efficiently manage dependencies and ensure a consistent setup for your projects.
