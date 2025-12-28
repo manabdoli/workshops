@@ -1,0 +1,715 @@
+---
+title: "5. JupyterLab Setup and Remote Connection on HPC"
+format: html
+---
+
+# JupyterLab Setup and Remote Connection on HPC
+
+## Overview
+This guide covers setting up JupyterLab on HPC, creating automated monitoring scripts, and connecting remotely via SSH tunneling.
+
+---
+
+## Part 1: Installing JupyterLab with Mamba
+
+### Basic Installation
+
+```bash
+# On HPC, activate base or create new environment
+mamba activate base
+
+# Or create dedicated environment
+mamba create -n jupyter python=3.11 jupyterlab ipykernel
+mamba activate jupyter
+
+# Install essential packages
+mamba install numpy pandas matplotlib scipy scikit-learn
+mamba install ipywidgets jupyterlab-git
+
+# Verify installation
+jupyter lab --version
+```
+
+### Installing Additional Kernels
+
+#### R Kernel
+
+```bash
+mamba activate jupyter
+mamba install r-irkernel r-essentials
+
+# Or manually in R
+R
+> install.packages('IRkernel')
+> IRkernel::installspec(user = TRUE)
+> quit()
+```
+
+#### Julia Kernel
+
+```bash
+mamba activate jupyter
+mamba install julia
+
+# In Julia
+julia
+> using Pkg
+> Pkg.add("IJulia")
+> exit()
+```
+
+#### MATLAB Kernel
+
+```bash
+mamba activate jupyter
+
+# Option 1: MATLAB Proxy (easier, web-based MATLAB)
+pip install jupyter-matlab-proxy
+
+# Option 2: MATLAB Engine (for programmatic access)
+module load matlab
+cd $(matlab -batch "disp(matlabroot)")/extern/engines/python
+python setup.py install
+
+# Verify all kernels
+jupyter kernelspec list
+```
+
+---
+
+## Part 2: JupyterLab Configuration
+
+### Create Configuration File
+
+```bash
+# On HPC
+jupyter lab --generate-config
+
+# This creates: ~/.jupyter/jupyter_lab_config.py
+```
+
+### Recommended Settings
+
+```bash
+# Edit config file
+nano ~/.jupyter/jupyter_lab_config.py
+
+# Add these settings:
+```
+
+```python
+# Disable timeout (prevents disconnections)
+c.ServerApp.shutdown_no_activity_timeout = 0
+c.MappingKernelManager.cull_idle_timeout = 0
+
+# Increase buffer size
+c.ServerApp.iopub_data_rate_limit = 10000000
+
+# Allow remote access
+c.ServerApp.allow_remote_access = True
+
+# Don't open browser automatically
+c.ServerApp.open_browser = False
+
+# Default directory
+c.ServerApp.root_dir = '/home/username/projects'
+
+# Disable token (if on secure network - not recommended)
+# c.ServerApp.token = ''
+
+# Custom port (if 8888 is taken)
+# c.ServerApp.port = 8889
+```
+
+---
+
+## Part 3: SLURM Launch Script
+
+### Basic Launch Script
+
+Save as `~/bin/launch_jupyter.sh`:
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=jupyter
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
+#SBATCH --time=08:00:00
+#SBATCH --output=jupyter_%j.out
+#SBATCH --error=jupyter_%j.out
+
+# Redirect stderr to stdout
+exec 2>&1
+
+# Get node and port info
+NODE=$(hostname -s)
+PORT=8888
+HOSTNAME="kepler.fullerton.edu"  # Change to your HPC
+
+echo "=========================================="
+echo "JUPYTER LAB STARTING"
+echo "=========================================="
+echo "Node: $NODE"
+echo "Port: $PORT"
+echo "Job ID: $SLURM_JOB_ID"
+echo "Time: $(date)"
+echo "=========================================="
+echo ""
+echo "STEP 1: On your LOCAL machine, run:"
+echo ""
+echo "  ssh -N -L ${PORT}:${NODE}:${PORT} ${USER}@${HOSTNAME}"
+echo ""
+echo "Note: Approve 2FA, then leave terminal open"
+echo ""
+echo "STEP 2: Open browser to:"
+echo ""
+echo "  http://localhost:${PORT}"
+echo ""
+echo "=========================================="
+
+# Load required modules
+module load python  # if needed
+
+# Initialize mamba
+source ~/miniforge3/etc/profile.d/conda.sh
+source ~/miniforge3/etc/profile.d/mamba.sh
+
+# Activate environment
+mamba activate jupyter
+
+# Show available kernels
+echo "Available kernels:"
+jupyter kernelspec list
+echo ""
+echo "Starting Jupyter Lab..."
+echo "Token will appear below:"
+echo "=========================================="
+echo ""
+
+# Start Jupyter Lab
+jupyter lab --no-browser --port=${PORT} --ip=${NODE}
+
+echo ""
+echo "=========================================="
+echo "Jupyter Lab has ended"
+echo "=========================================="
+```
+
+Make executable:
+```bash
+chmod +x ~/bin/launch_jupyter.sh
+```
+
+---
+
+## Part 4: Automated Progress Monitoring
+
+### Auto-Watch Script
+
+Save as `~/bin/watch_jupyter.sh`:
+
+```bash
+#!/bin/bash
+# Automatically watch Jupyter job output
+
+JOB_ID=$1
+
+if [ -z "$JOB_ID" ]; then
+    echo "Usage: $0 <job_id>"
+    echo ""
+    echo "Recent Jupyter jobs:"
+    squeue -u $USER --name=jupyter --format="%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R"
+    exit 1
+fi
+
+OUTPUT_FILE="jupyter_${JOB_ID}.out"
+
+echo "Watching $OUTPUT_FILE"
+echo "Press Ctrl+C to stop watching (job continues running)"
+echo "=========================================="
+
+# Wait for file to be created
+while [ ! -f "$OUTPUT_FILE" ]; do
+    echo "Waiting for job to start..."
+    sleep 2
+done
+
+# Show updates
+tail -f "$OUTPUT_FILE"
+```
+
+Make executable:
+```bash
+chmod +x ~/bin/watch_jupyter.sh
+```
+
+### Submit and Watch Script
+
+Save as `~/bin/start_jupyter.sh`:
+
+```bash
+#!/bin/bash
+# Submit Jupyter job and automatically watch output
+
+echo "Submitting Jupyter Lab job..."
+
+# Submit job and capture job ID
+OUTPUT=$(sbatch ~/bin/launch_jupyter.sh)
+JOB_ID=$(echo $OUTPUT | awk '{print $4}')
+
+echo "Job submitted: $JOB_ID"
+echo ""
+echo "Watching output..."
+echo "Press Ctrl+C to stop watching (job continues)"
+echo "=========================================="
+echo ""
+
+# Wait a moment for file to be created
+sleep 3
+
+# Watch output
+tail -f jupyter_${JOB_ID}.out
+```
+
+Make executable:
+```bash
+chmod +x ~/bin/start_jupyter.sh
+```
+
+---
+
+## Part 5: Enhanced Monitoring Script
+
+Save as `~/bin/jupyter_status.sh`:
+
+```bash
+#!/bin/bash
+# Comprehensive Jupyter job status
+
+echo "=========================================="
+echo "JUPYTER LAB STATUS"
+echo "=========================================="
+echo ""
+
+# Show running jobs
+JOBS=$(squeue -u $USER --name=jupyter --format="%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" | tail -n +2)
+
+if [ -z "$JOBS" ]; then
+    echo "No Jupyter jobs running"
+else
+    echo "Running Jobs:"
+    echo "-------------------------------------------"
+    squeue -u $USER --name=jupyter --format="%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R"
+    echo ""
+    
+    # For each job, show connection info
+    while read -r line; do
+        JOB_ID=$(echo $line | awk '{print $1}')
+        OUTPUT_FILE="jupyter_${JOB_ID}.out"
+        
+        if [ -f "$OUTPUT_FILE" ]; then
+            echo "Connection info for job $JOB_ID:"
+            echo "-------------------------------------------"
+            grep "ssh -N -L" "$OUTPUT_FILE" | head -1
+            grep "http://localhost" "$OUTPUT_FILE" | head -1
+            echo ""
+            
+            # Extract and show token
+            TOKEN=$(grep "token=" "$OUTPUT_FILE" | head -1 | sed 's/.*token=\([^ ]*\).*/\1/')
+            if [ ! -z "$TOKEN" ]; then
+                echo "Token: $TOKEN"
+                echo ""
+            fi
+        fi
+    done <<< "$JOBS"
+fi
+
+# Show recent jobs
+echo "Recent Completed Jobs:"
+echo "-------------------------------------------"
+sacct -u $USER --name=jupyter --format=JobID,JobName,State,Elapsed,End --starttime=$(date -d '7 days ago' +%Y-%m-%d) | tail -10
+
+echo ""
+echo "=========================================="
+```
+
+Make executable:
+```bash
+chmod +x ~/bin/jupyter_status.sh
+```
+
+---
+
+## Part 6: Connection Workflow
+
+### Method 1: Manual Workflow
+
+```bash
+# Terminal 1: On HPC
+sbatch ~/bin/launch_jupyter.sh
+
+# Get job ID
+squeue -u $USER
+
+# Check output for connection info
+cat jupyter_<job_id>.out
+
+# Terminal 2: On LOCAL machine
+# Copy the ssh command from output
+ssh -N -L 8888:compute-node-15:8888 username@kepler.fullerton.edu
+
+# Browser: On LOCAL machine
+# Open: http://localhost:8888
+# Paste token from output
+```
+
+### Method 2: Automated Workflow
+
+```bash
+# On HPC, just run:
+~/bin/start_jupyter.sh
+
+# This:
+# 1. Submits job
+# 2. Shows connection info
+# 3. Displays token when available
+
+# Then on LOCAL machine:
+# Copy ssh command from output
+# Create tunnel
+# Open browser
+```
+
+### Method 3: Helper Script for Local Machine
+
+On your LOCAL machine, save as `~/bin/connect_jupyter.sh`:
+
+```bash
+#!/bin/bash
+# Connect to HPC Jupyter instance
+
+HPC_HOST="kepler.fullerton.edu"
+HPC_USER="your_username"
+PORT=8888
+
+echo "Checking for running Jupyter jobs on HPC..."
+
+# SSH to HPC and get job info
+JOB_INFO=$(ssh ${HPC_USER}@${HPC_HOST} "squeue -u \$USER --name=jupyter --format='%.18i %.6D %R' | tail -n +2")
+
+if [ -z "$JOB_INFO" ]; then
+    echo "No Jupyter jobs running on HPC"
+    echo "Start one with: ssh $HPC_HOST '~/bin/start_jupyter.sh'"
+    exit 1
+fi
+
+echo "$JOB_INFO"
+echo ""
+
+# Get node name
+NODE=$(echo $JOB_INFO | awk '{print $3}')
+JOB_ID=$(echo $JOB_INFO | awk '{print $1}')
+
+echo "Creating SSH tunnel to $NODE..."
+echo "Browser URL: http://localhost:${PORT}"
+echo ""
+
+# Get token
+TOKEN=$(ssh ${HPC_USER}@${HPC_HOST} "grep 'token=' jupyter_${JOB_ID}.out | head -1 | sed 's/.*token=\([^ ]*\).*/\1/'")
+
+if [ ! -z "$TOKEN" ]; then
+    echo "Token: $TOKEN"
+    echo "Full URL: http://localhost:${PORT}/lab?token=${TOKEN}"
+    echo ""
+fi
+
+echo "Press Ctrl+C to disconnect (Jupyter keeps running)"
+echo "=================================================="
+
+# Create tunnel
+ssh -N -L ${PORT}:${NODE}:${PORT} ${HPC_USER}@${HPC_HOST}
+```
+
+Make executable:
+```bash
+chmod +x ~/bin/connect_jupyter.sh
+```
+
+---
+
+## Part 7: Advanced Features
+
+### Multiple Simultaneous Jupyter Instances
+
+```bash
+# Launch on different ports
+sbatch --export=PORT=8888 ~/bin/launch_jupyter.sh
+sbatch --export=PORT=8889 ~/bin/launch_jupyter.sh
+
+# Connect to each
+# Terminal 1: ssh -N -L 8888:node1:8888 hpc
+# Terminal 2: ssh -N -L 8889:node2:8889 hpc
+
+# Access
+# Browser 1: http://localhost:8888
+# Browser 2: http://localhost:8889
+```
+
+### Custom Resource Requests
+
+```bash
+# GPU job
+sbatch --gres=gpu:1 ~/bin/launch_jupyter.sh
+
+# High memory
+sbatch --mem=64G ~/bin/launch_jupyter.sh
+
+# Long running
+sbatch --time=24:00:00 ~/bin/launch_jupyter.sh
+
+# Multiple CPUs
+sbatch --cpus-per-task=16 ~/bin/launch_jupyter.sh
+```
+
+### JupyterLab Extensions
+
+```bash
+mamba activate jupyter
+
+# Git integration
+pip install jupyterlab-git
+
+# System monitor
+pip install jupyter-resource-usage
+
+# Code formatter
+pip install jupyterlab-code-formatter black
+
+# Table of contents
+pip install jupyterlab-toc
+
+# Rebuild JupyterLab
+jupyter lab build
+```
+
+---
+
+## Part 8: Troubleshooting
+
+### Port Already in Use
+
+```bash
+# Check for existing Jupyter jobs
+squeue -u $USER --name=jupyter
+
+# Or specify different port
+sbatch --export=PORT=8889 ~/bin/launch_jupyter.sh
+
+# Update tunnel command
+ssh -N -L 8889:node:8889 hpc
+```
+
+### Connection Refused
+
+```bash
+# 1. Check job is running
+squeue -u $USER
+
+# 2. Check output file for errors
+cat jupyter_<job_id>.out
+
+# 3. Verify node name
+squeue -u $USER --name=jupyter -o "%.18i %.6D %R"
+
+# 4. Test SSH tunnel
+ssh -v -N -L 8888:compute-node:8888 hpc
+```
+
+### Token Not Working
+
+```bash
+# Get fresh token from output
+cat jupyter_<job_id>.out | grep "token="
+
+# Or disable token (less secure)
+# In jupyter_lab_config.py:
+# c.ServerApp.token = ''
+```
+
+### Jupyter Keeps Disconnecting
+
+```bash
+# Increase timeout in config
+echo "c.ServerApp.shutdown_no_activity_timeout = 0" >> ~/.jupyter/jupyter_lab_config.py
+echo "c.MappingKernelManager.cull_idle_timeout = 0" >> ~/.jupyter/jupyter_lab_config.py
+
+# Check network stability
+# May need to run from campus or VPN
+```
+
+### Can't Load Kernels
+
+```bash
+# Check kernel list
+jupyter kernelspec list
+
+# Reinstall kernel
+mamba activate myenv
+python -m ipykernel install --user --name myenv
+
+# Restart Jupyter
+scancel <job_id>
+sbatch ~/bin/launch_jupyter.sh
+```
+
+---
+
+## Part 9: Best Practices
+
+### 1. Use tmux with Jupyter
+
+```bash
+# Before starting Jupyter
+tmux new -s jupyter
+sbatch ~/bin/launch_jupyter.sh
+
+# If connection drops
+ssh hpc
+tmux attach -s jupyter
+# Still have access to job monitoring
+```
+
+### 2. Regular Checkpoints
+
+In notebook:
+```python
+# Save intermediate results
+import pickle
+
+# After expensive computation
+with open('results_checkpoint.pkl', 'wb') as f:
+    pickle.dump(results, f)
+
+# Later, load if needed
+with open('results_checkpoint.pkl', 'rb') as f:
+    results = pickle.load(f)
+```
+
+### 3. Monitor Resource Usage
+
+```python
+# In notebook, check resources
+import os
+import psutil
+
+# Memory usage
+process = psutil.Process(os.getpid())
+print(f"Memory: {process.memory_info().rss / 1024**3:.2f} GB")
+
+# CPU usage
+print(f"CPU: {psutil.cpu_percent()}%")
+```
+
+### 4. Clean Up Completed Jobs
+
+```bash
+# Remove old output files
+rm jupyter_*.out
+
+# Cancel stuck jobs
+scancel <job_id>
+
+# Check historical jobs
+sacct -u $USER --name=jupyter --starttime=$(date -d '7 days ago' +%Y-%m-%d)
+```
+
+---
+
+## Part 10: Quick Reference
+
+### Essential Commands
+
+```bash
+# Submit Jupyter job
+sbatch ~/bin/launch_jupyter.sh
+
+# Check status
+squeue -u $USER --name=jupyter
+
+# View output
+cat jupyter_<job_id>.out
+
+# Watch output live
+tail -f jupyter_<job_id>.out
+
+# Cancel job
+scancel <job_id>
+
+# Connect from local machine
+ssh -N -L 8888:node:8888 username@hpc.edu
+```
+
+### Helper Scripts
+
+```bash
+# Start and watch
+~/bin/start_jupyter.sh
+
+# Check status of all Jupyter jobs
+~/bin/jupyter_status.sh
+
+# Watch specific job
+~/bin/watch_jupyter.sh <job_id>
+
+# Connect from local machine
+~/bin/connect_jupyter.sh
+```
+
+---
+
+## Part 11: Alternative: Use HPC's JupyterHub
+
+Many HPCs provide JupyterHub - a multi-user Jupyter server:
+
+```bash
+# Check if available
+# Look for URLs like:
+# - https://jupyter.hpc.institution.edu
+# - https://ondemand.hpc.institution.edu
+
+# Or ask:
+# module avail jupyterhub
+```
+
+**Benefits of JupyterHub:**
+- ✅ No SSH tunneling needed
+- ✅ Access via web browser
+- ✅ Choose resources (CPUs, memory, time)
+- ✅ Persistent sessions
+- ✅ Easier for beginners
+
+**To use:**
+1. Navigate to JupyterHub URL
+2. Login with HPC credentials
+3. Select resources
+4. Start server
+5. Work in browser
+
+---
+
+## Summary Checklist
+
+- [ ] JupyterLab installed with mamba
+- [ ] Additional kernels installed (R, Julia, MATLAB)
+- [ ] Configuration file customized
+- [ ] Launch script created and tested
+- [ ] Monitoring scripts set up
+- [ ] Successfully connected from local machine
+- [ ] Can access notebook with token
+- [ ] Understand how to submit with different resources
+- [ ] Know how to troubleshoot common issues
+- [ ] (Optional) Checked for institutional JupyterHub
+
+You're now ready for productive remote Jupyter development on HPC!

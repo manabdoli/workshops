@@ -1,0 +1,715 @@
+---
+title: "3. Creating Mamba Environments for Different Purposes"
+format: html
+---
+
+# Creating Mamba Environments for Different Purposes
+
+## Overview
+Mamba is a fast, drop-in replacement for Conda. This guide shows you how to create and manage purpose-specific environments on HPC.
+
+---
+
+## Part 1: Installing Mamba (Miniforge)
+
+```bash
+# On HPC, download Miniforge (includes Mamba)
+wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh
+
+# Install to your home directory
+bash Miniforge3-Linux-x86_64.sh -b -p ~/miniforge3
+
+# Initialize your shell
+~/miniforge3/bin/conda init bash
+
+# Logout and login again, or:
+source ~/.bashrc
+
+# Verify installation
+mamba --version
+conda --version
+```
+
+---
+
+## Part 2: Configure Mamba for HPC
+
+```bash
+# Create/edit ~/.condarc
+cat > ~/.condarc << 'EOF'
+channels:
+  - conda-forge
+  - defaults
+channel_priority: strict
+auto_activate_base: false
+env_prompt: '({name}) '
+create_default_packages:
+  - pip
+  - ipython
+EOF
+```
+
+**What these settings do:**
+- `conda-forge` first: Use community packages (usually newer)
+- `auto_activate_base: false`: Don't auto-activate base environment
+- `env_prompt`: Show environment name in prompt
+- `create_default_packages`: Install these in every new environment
+
+---
+
+## Part 3: Environment Management Basics
+
+### Create Environment
+
+```bash
+# Basic environment
+mamba create -n myenv python=3.11
+
+# With specific packages
+mamba create -n myenv python=3.11 numpy pandas matplotlib
+
+# From environment file
+mamba env create -f environment.yml
+```
+
+### Activate/Deactivate
+
+```bash
+# Activate
+mamba activate myenv
+
+# Deactivate
+mamba deactivate
+
+# Or use conda (works the same)
+conda activate myenv
+```
+
+### List Environments
+
+```bash
+# List all environments
+mamba env list
+
+# Or
+conda env list
+```
+
+### Remove Environment
+
+```bash
+# Remove environment
+mamba env remove -n myenv
+
+# Or remove with cleanup
+mamba remove -n myenv --all
+```
+
+---
+
+## Part 4: Purpose-Specific Environments
+
+### 1. General Data Science Environment
+
+```bash
+mamba create -n datascience python=3.11 \
+    numpy pandas scipy matplotlib seaborn \
+    scikit-learn statsmodels plotly \
+    jupyter jupyterlab ipykernel \
+    ipywidgets nbconvert
+
+# Activate
+mamba activate datascience
+
+# Add more packages
+mamba install xarray dask netcdf4
+```
+
+**Use for:** General data analysis, exploratory work, visualization
+
+---
+
+### 2. Machine Learning Environment
+
+```bash
+mamba create -n ml python=3.11 \
+    numpy pandas scikit-learn \
+    jupyter jupyterlab ipykernel
+
+mamba activate ml
+
+# CPU-only PyTorch
+mamba install pytorch torchvision cpuonly -c pytorch
+
+# OR GPU PyTorch (check CUDA version first: nvidia-smi)
+mamba install pytorch torchvision pytorch-cuda=11.8 -c pytorch -c nvidia
+
+# Additional ML tools
+mamba install tensorboard transformers datasets
+mamba install xgboost lightgbm catboost
+
+# Deep learning utilities
+pip install pytorch-lightning timm albumentations
+```
+
+**Use for:** Machine learning, deep learning, neural networks
+
+---
+
+### 3. Bioinformatics Environment
+
+```bash
+mamba create -n bioinfo python=3.11 \
+    biopython pysam numpy pandas \
+    scipy matplotlib seaborn \
+    jupyter jupyterlab ipykernel
+
+mamba activate bioinfo
+
+# Bioinformatics tools
+mamba install -c bioconda samtools bcftools bedtools
+mamba install -c bioconda star hisat2 bowtie2
+mamba install -c bioconda fastqc multiqc
+```
+
+**Use for:** Genomics, sequencing analysis, bioinformatics pipelines
+
+---
+
+### 4. R Data Science Environment
+
+```bash
+mamba create -n rstats python=3.11 \
+    r-base=4.3 r-essentials \
+    r-irkernel r-tidyverse r-ggplot2 \
+    r-data.table r-caret r-randomforest \
+    jupyter jupyterlab
+
+mamba activate rstats
+
+# Configure R kernel for Jupyter
+R -e "IRkernel::installspec(user = TRUE)"
+```
+
+**Use for:** Statistical analysis, R notebooks, data visualization in R
+
+---
+
+### 5. Geospatial Analysis Environment
+
+```bash
+mamba create -n geo python=3.11 \
+    numpy pandas geopandas \
+    rasterio shapely fiona \
+    matplotlib cartopy \
+    jupyter jupyterlab ipykernel
+
+mamba activate geo
+
+# Additional geospatial tools
+mamba install folium leafmap geemap
+mamba install xarray rioxarray
+```
+
+**Use for:** GIS, remote sensing, spatial analysis
+
+---
+
+### 6. Time Series Analysis Environment
+
+```bash
+mamba create -n timeseries python=3.11 \
+    numpy pandas statsmodels \
+    scipy matplotlib seaborn \
+    jupyter jupyterlab ipykernel
+
+mamba activate timeseries
+
+# Time series specific packages
+mamba install prophet
+pip install pmdarima neuralprophet
+pip install tslearn tsfresh
+```
+
+**Use for:** Forecasting, time series modeling, temporal data
+
+---
+
+### 7. Natural Language Processing Environment
+
+```bash
+mamba create -n nlp python=3.11 \
+    numpy pandas scipy \
+    jupyter jupyterlab ipykernel
+
+mamba activate nlp
+
+# NLP packages
+mamba install nltk spacy gensim
+pip install transformers datasets tokenizers
+pip install sentence-transformers
+pip install textblob wordcloud
+
+# Download spaCy model
+python -m spacy download en_core_web_sm
+```
+
+**Use for:** Text analysis, NLP, language models
+
+---
+
+### 8. Computer Vision Environment
+
+```bash
+mamba create -n cv python=3.11 \
+    numpy pandas matplotlib \
+    jupyter jupyterlab ipykernel
+
+mamba activate cv
+
+# Computer vision packages
+mamba install opencv pillow scikit-image
+mamba install pytorch torchvision pytorch-cuda=11.8 -c pytorch -c nvidia
+pip install albumentations timm
+pip install ultralytics  # YOLO
+```
+
+**Use for:** Image processing, object detection, computer vision
+
+---
+
+### 9. Minimal Testing Environment
+
+```bash
+mamba create -n test python=3.11 \
+    pytest pytest-cov pytest-mock \
+    ipython jupyter
+
+# Lightweight for quick tests
+```
+
+**Use for:** Testing code, debugging, quick experiments
+
+---
+
+## Part 5: Environment Files for Reproducibility
+
+### Create environment.yml
+
+```bash
+# From existing environment
+mamba activate myenv
+mamba env export > environment.yml
+
+# Or create manually
+cat > environment.yml << 'EOF'
+name: myproject
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas
+  - matplotlib
+  - scikit-learn
+  - jupyter
+  - pip
+  - pip:
+      - some-pip-only-package
+EOF
+```
+
+### Share Environment
+
+```bash
+# Create from file
+mamba env create -f environment.yml
+
+# Update existing environment
+mamba env update -f environment.yml
+```
+
+### Minimal vs Full Export
+
+```bash
+# Minimal (only explicitly installed packages)
+mamba env export --from-history > environment.yml
+
+# Full (all packages including dependencies)
+mamba env export > environment_full.yml
+
+# Cross-platform (no builds)
+mamba env export --no-builds > environment_crossplatform.yml
+```
+
+---
+
+## Part 6: Managing Packages
+
+### Install Packages
+
+```bash
+# Install single package
+mamba install package-name
+
+# Install multiple packages
+mamba install numpy pandas matplotlib
+
+# Install from specific channel
+mamba install -c bioconda samtools
+
+# Install specific version
+mamba install numpy=1.24.0
+
+# Install with pip (when not in conda)
+pip install package-name
+```
+
+### Update Packages
+
+```bash
+# Update single package
+mamba update package-name
+
+# Update all packages
+mamba update --all
+
+# Update mamba itself
+mamba update -n base mamba
+```
+
+### Remove Packages
+
+```bash
+# Remove package
+mamba remove package-name
+
+# Remove multiple packages
+mamba remove numpy pandas
+```
+
+### List Packages
+
+```bash
+# List all packages in current environment
+mamba list
+
+# List packages matching pattern
+mamba list numpy
+
+# Show package info
+mamba info package-name
+```
+
+### Search Packages
+
+```bash
+# Search for package
+mamba search package-name
+
+# Search with wildcards
+mamba search "*tensorflow*"
+```
+
+---
+
+## Part 7: Environment Best Practices
+
+### 1. One Environment Per Project
+
+```bash
+projects/
+├── project1/
+│   └── environment.yml
+├── project2/
+│   └── environment.yml
+└── project3/
+    └── environment.yml
+
+# Each project has its own environment
+mamba env create -f projects/project1/environment.yml
+```
+
+### 2. Keep Environments Lean
+
+```bash
+# Don't install everything in one environment
+# Create focused environments
+
+# Bad: One huge environment with everything
+mamba create -n everything python numpy pandas pytorch tensorflow ...
+
+# Good: Focused environments
+mamba create -n pytorch_project python pytorch
+mamba create -n tensorflow_project python tensorflow
+```
+
+### 3. Pin Critical Versions
+
+```yaml
+# In environment.yml, pin versions that matter
+dependencies:
+  - python=3.11  # Exact version
+  - numpy>=1.24,<2.0  # Range
+  - pandas  # Latest version
+```
+
+### 4. Document Your Environments
+
+```bash
+# Add README.md to your project
+cat > README.md << 'EOF'
+# My Project
+
+## Setup Environment
+
+```bash
+mamba env create -f environment.yml
+mamba activate myproject
+```
+
+## Required Modules on HPC
+```bash
+module load gcc/11.3.0
+module load cuda/11.8
+```
+EOF
+```
+
+---
+
+## Part 8: Working with Jupyter Kernels
+
+### Register Environment as Jupyter Kernel
+
+```bash
+# Activate environment
+mamba activate myenv
+
+# Install ipykernel
+mamba install ipykernel
+
+# Register kernel
+python -m ipykernel install --user --name myenv --display-name "Python (myenv)"
+
+# Verify
+jupyter kernelspec list
+```
+
+### Remove Kernel
+
+```bash
+# List kernels
+jupyter kernelspec list
+
+# Remove kernel
+jupyter kernelspec uninstall myenv
+```
+
+### Use Different Kernels in Jupyter
+
+```bash
+# Start Jupyter (from any environment)
+mamba activate jupyter
+jupyter lab
+
+# In notebook: Kernel → Change Kernel → Select your kernel
+```
+
+---
+
+## Part 9: Cleaning Up
+
+### Remove Unused Packages
+
+```bash
+# Clean cache
+mamba clean --all
+
+# Check disk usage
+du -sh ~/miniforge3/
+
+# Remove tarballs and cache
+mamba clean --packages --tarballs
+```
+
+### Remove Old Environments
+
+```bash
+# List environments
+mamba env list
+
+# Remove unused ones
+mamba env remove -n old_env1
+mamba env remove -n old_env2
+```
+
+### Check Disk Quota
+
+```bash
+# Check usage
+df -h ~
+du -sh ~/miniforge3/
+
+# Check HPC quota
+quota -s
+```
+
+---
+
+## Part 10: Troubleshooting
+
+### "Solving environment" Takes Forever
+
+```bash
+# Use mamba instead of conda (much faster)
+mamba install package-name
+
+# Clear cache
+mamba clean --all
+
+# Simplify environment
+# Install fewer packages at once
+```
+
+### Package Conflicts
+
+```bash
+# Create new environment instead of updating
+mamba create -n newenv python=3.11 package1 package2
+
+# Specify compatible versions
+mamba create -n myenv python=3.11 numpy=1.24 pandas=2.0
+```
+
+### Can't Find Package
+
+```bash
+# Search in conda-forge
+mamba search -c conda-forge package-name
+
+# Try pip as last resort
+pip install package-name
+```
+
+### Environment Won't Activate
+
+```bash
+# Reinitialize conda
+~/miniforge3/bin/conda init bash
+source ~/.bashrc
+
+# Check environment exists
+mamba env list
+```
+
+---
+
+## Part 11: Example SLURM Scripts
+
+### Using Specific Environment in Job
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=my_analysis
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --time=04:00:00
+#SBATCH --output=job_%j.out
+
+# Load any required modules
+module load gcc/11.3.0
+
+# Initialize conda/mamba
+source ~/miniforge3/etc/profile.d/conda.sh
+source ~/miniforge3/etc/profile.d/mamba.sh
+
+# Activate specific environment
+mamba activate myproject
+
+# Run your code
+python analysis.py
+
+# Or run R
+Rscript analysis.R
+
+# Or run Julia
+julia analysis.jl
+```
+
+---
+
+## Part 12: Quick Reference
+
+### Common Commands
+
+```bash
+# Create environment
+mamba create -n myenv python=3.11 package1 package2
+
+# Activate
+mamba activate myenv
+
+# Install packages
+mamba install package-name
+
+# Update packages
+mamba update package-name
+
+# List packages
+mamba list
+
+# Export environment
+mamba env export > environment.yml
+
+# Remove environment
+mamba env remove -n myenv
+
+# Clean cache
+mamba clean --all
+```
+
+---
+
+## Part 13: Example Workflow
+
+```bash
+# 1. Create environment for new project
+cd ~/projects/my_analysis
+mamba create -n my_analysis python=3.11 numpy pandas matplotlib jupyter
+
+# 2. Activate and add more packages as needed
+mamba activate my_analysis
+mamba install scikit-learn seaborn
+
+# 3. Register as Jupyter kernel
+python -m ipykernel install --user --name my_analysis
+
+# 4. Export for reproducibility
+mamba env export > environment.yml
+
+# 5. Commit environment.yml to git
+git add environment.yml
+git commit -m "Add environment specification"
+
+# 6. Collaborators can recreate
+git clone your-repo
+cd your-repo
+mamba env create -f environment.yml
+```
+
+---
+
+## Summary Checklist
+
+- [ ] Miniforge/Mamba installed
+- [ ] ~/.condarc configured
+- [ ] Created purpose-specific environments
+- [ ] Registered environments as Jupyter kernels
+- [ ] Exported environment.yml files
+- [ ] Tested activation in SLURM jobs
+- [ ] Cleaned up cache and old environments
+
+You're now ready to manage multiple project environments efficiently on HPC!

@@ -1,0 +1,340 @@
+---
+title: "1. SSH Key Setup and First HPC Connection"
+format: html
+---
+
+# SSH Key Setup and First HPC Connection
+
+## Overview
+This guide walks you through creating SSH keys and connecting to your HPC cluster for the first time.
+
+---
+
+## Step 1: Check for Existing SSH Keys
+
+```bash
+# On your LOCAL machine
+ls -la ~/.ssh/
+
+# Look for files like:
+# id_rsa / id_rsa.pub (older RSA keys)
+# id_ed25519 / id_ed25519.pub (newer, recommended)
+# id_ecdsa / id_ecdsa.pub
+```
+
+**If you see existing keys:**
+- You can reuse them (skip to Step 3)
+- Or create new ones specifically for HPC (continue to Step 2)
+
+---
+
+## Step 2: Generate New SSH Key Pair
+
+### Option A: ED25519 Key (RECOMMENDED)
+
+Modern, secure, and faster:
+
+```bash
+# On your LOCAL machine
+ssh-keygen -t ed25519 -C "your.email@domain.com" -f ~/.ssh/hpc_key
+
+# When prompted:
+# Enter file: ~/.ssh/hpc_key (already specified with -f)
+# Enter passphrase: [optional but recommended for security]
+# Confirm passphrase: [same as above]
+```
+
+### Option B: RSA Key (if HPC doesn't support ED25519)
+
+```bash
+# On your LOCAL machine
+ssh-keygen -t rsa -b 4096 -C "your.email@domain.com" -f ~/.ssh/hpc_key
+
+# Follow same prompts as above
+```
+
+**What you get:**
+- `~/.ssh/hpc_key` - Private key (NEVER share this!)
+- `~/.ssh/hpc_key.pub` - Public key (this goes on HPC)
+
+---
+
+## Step 3: Set Correct Permissions
+
+SSH is strict about file permissions:
+
+```bash
+# On your LOCAL machine
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/hpc_key
+chmod 644 ~/.ssh/hpc_key.pub
+```
+
+---
+
+## Step 4: Copy Public Key to HPC
+
+### Method A: Using ssh-copy-id (EASIEST)
+
+```bash
+# On your LOCAL machine
+ssh-copy-id -i ~/.ssh/hpc_key.pub your_username@hpc.institution.edu
+
+# Enter your password when prompted
+# This automatically adds your key to ~/.ssh/authorized_keys on HPC
+```
+
+### Method B: Manual Copy (if ssh-copy-id unavailable)
+
+```bash
+# On your LOCAL machine
+
+# 1. Display your public key
+cat ~/.ssh/hpc_key.pub
+
+# 2. Copy the output (entire line starting with ssh-ed25519 or ssh-rsa)
+
+# 3. SSH to HPC with password
+ssh your_username@hpc.institution.edu
+
+# 4. On HPC, create .ssh directory if it doesn't exist
+mkdir -p ~/.ssh
+chmod 700 ~/.ssh
+
+# 5. Add your public key
+nano ~/.ssh/authorized_keys
+# Paste your public key on a new line
+# Save: Ctrl+O, Enter, Ctrl+X
+
+# 6. Set correct permissions
+chmod 600 ~/.ssh/authorized_keys
+
+# 7. Exit HPC
+exit
+```
+
+---
+
+## Step 5: Configure SSH on Local Machine
+
+Create/edit `~/.ssh/config`:
+
+```bash
+# On your LOCAL machine
+nano ~/.ssh/config
+```
+
+Add this configuration:
+
+```
+Host hpc
+    HostName hpc.institution.edu
+    User your_username
+    IdentityFile ~/.ssh/hpc_key
+    IdentitiesOnly yes
+    ServerAliveInterval 60
+    ServerAliveCountMax 30
+    TCPKeepAlive yes
+    Compression yes
+    ForwardAgent yes
+```
+
+**Explanation:**
+- `Host hpc` - Alias you'll use (can be anything)
+- `HostName` - Actual HPC address
+- `User` - Your HPC username
+- `IdentityFile` - Path to your private key
+- `IdentitiesOnly yes` - Only use specified key
+- `ServerAliveInterval/CountMax` - Keep connection alive
+- `Compression yes` - Compress data for faster transfer
+- `ForwardAgent yes` - Allow key forwarding to compute nodes
+
+Save: `Ctrl+O`, `Enter`, `Ctrl+X`
+
+Set permissions:
+```bash
+chmod 600 ~/.ssh/config
+```
+
+---
+
+## Step 6: Test SSH Connection
+
+```bash
+# On your LOCAL machine
+
+# Test with verbose output to see what's happening
+ssh -v hpc
+
+# If everything works, you should:
+# 1. Not be asked for a password (unless you set a passphrase)
+# 2. Be prompted for 2FA if your HPC uses it
+# 3. Successfully log into HPC
+
+# You should see in the verbose output:
+# debug1: Offering public key: ~/.ssh/hpc_key
+# debug1: Server accepts key: ...
+# debug1: Authentication succeeded (publickey).
+```
+
+---
+
+## Step 7: Add Key to SSH Agent (Optional but Recommended)
+
+This prevents you from typing your passphrase every time:
+
+```bash
+# On your LOCAL machine
+
+# Start SSH agent
+eval "$(ssh-agent -s)"
+
+# Add your key
+ssh-add ~/.ssh/hpc_key
+
+# If you set a passphrase, enter it now
+# You'll only need to enter it once per session
+
+# Verify key is added
+ssh-add -l
+```
+
+### Make SSH Agent Persistent
+
+Add to `~/.bash_profile` or `~/.zshrc`:
+
+```bash
+# On your LOCAL machine
+nano ~/.bash_profile  # or ~/.zshrc on macOS with zsh
+
+# Add these lines:
+if [ -z "$SSH_AUTH_SOCK" ]; then
+   eval "$(ssh-agent -s)"
+   ssh-add ~/.ssh/hpc_key 2>/dev/null
+fi
+```
+
+---
+
+## Step 8: Test Connection with Alias
+
+Now you can use the short alias:
+
+```bash
+# Instead of: ssh your_username@hpc.institution.edu
+# Just type:
+ssh hpc
+
+# Should connect without password!
+```
+
+---
+
+## Troubleshooting
+
+### "Permission denied (publickey)"
+
+```bash
+# 1. Check key permissions
+ls -la ~/.ssh/hpc_key
+# Should show: -rw------- (600)
+
+# 2. Verify public key is on HPC
+ssh your_username@hpc.institution.edu  # using password
+cat ~/.ssh/authorized_keys
+# Should contain your public key
+
+# 3. Test with verbose mode
+ssh -vvv hpc
+# Look for "Offering public key" and "Server accepts key"
+
+# 4. Check if key is in agent
+ssh-add -l
+```
+
+### "Host key verification failed"
+
+```bash
+# HPC's host key changed (common after maintenance)
+ssh-keygen -R hpc.institution.edu
+# Then try connecting again
+```
+
+### Key not being used
+
+```bash
+# Explicitly specify key
+ssh -i ~/.ssh/hpc_key hpc
+
+# If this works, check your config file syntax
+cat ~/.ssh/config
+```
+
+### Connection times out
+
+```bash
+# Check if you need VPN
+# Many institutions require VPN for off-campus access
+
+# Test basic connectivity
+ping hpc.institution.edu
+
+# Check if port 22 is open
+nc -zv hpc.institution.edu 22
+```
+
+---
+
+## Multiple HPC Systems
+
+If you work with multiple HPC clusters:
+
+```bash
+# Create separate keys for each
+ssh-keygen -t ed25519 -f ~/.ssh/hpc1_key -C "HPC Cluster 1"
+ssh-keygen -t ed25519 -f ~/.ssh/hpc2_key -C "HPC Cluster 2"
+
+# Configure in ~/.ssh/config
+Host hpc1
+    HostName cluster1.institution.edu
+    User username1
+    IdentityFile ~/.ssh/hpc1_key
+    IdentitiesOnly yes
+
+Host hpc2
+    HostName cluster2.institution.edu
+    User username2
+    IdentityFile ~/.ssh/hpc2_key
+    IdentitiesOnly yes
+
+# Add all keys to agent
+ssh-add ~/.ssh/hpc1_key
+ssh-add ~/.ssh/hpc2_key
+
+# Connect to either
+ssh hpc1
+ssh hpc2
+```
+
+---
+
+## Security Best Practices
+
+1. **Use passphrase**: Protects key if laptop is stolen
+2. **Use IdentitiesOnly yes**: Prevents trying all keys
+3. **Never share private key**: Only copy `.pub` files
+4. **Backup your keys**: Store securely (encrypted USB, password manager)
+5. **Rotate keys periodically**: Generate new keys every 1-2 years
+6. **Use ED25519**: More secure and faster than RSA
+
+---
+
+## Next Steps
+
+Once SSH is working:
+- ✅ Set up VSCodium for remote development
+- ✅ Create mamba environments
+- ✅ Transfer data with rsync
+- ✅ Set up JupyterLab
+
+See the other workflow guides for these topics!

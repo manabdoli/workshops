@@ -1,0 +1,696 @@
+---
+title: "2. VSCodium Remote Development Workflow"
+format: html
+---
+
+# VSCodium Remote Development Workflow
+
+## Overview
+VSCodium is the open-source version of VS Code without Microsoft telemetry. This guide shows you how to set it up for stable, productive remote development on HPC.
+
+---
+
+## Part 1: Installation
+
+### macOS
+```bash
+brew install vscodium
+```
+
+### Linux (Debian/Ubuntu)
+```bash
+wget -qO - https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/raw/master/pub.gpg | gpg --dearmor | sudo dd of=/usr/share/keyrings/vscodium-archive-keyring.gpg
+
+echo 'deb [signed-by=/usr/share/keyrings/vscodium-archive-keyring.gpg] https://download.vscodium.com/debs vscodium main' | sudo tee /etc/apt/sources.list.d/vscodium.list
+
+sudo apt update && sudo apt install codium
+```
+
+### Linux (Fedora/RHEL)
+```bash
+sudo rpm --import https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/-/raw/master/pub.gpg
+
+printf "[gitlab.com_paulcarroty_vscodium_repo]\nname=download.vscodium.com\nbaseurl=https://download.vscodium.com/rpms/\nenabled=1\ngpgcheck=1\nrepo_gpgcheck=1\ngpgkey=https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/-/raw/master/pub.gpg\nmetadata_expire=1h" | sudo tee -a /etc/yum.repos.d/vscodium.repo
+
+sudo dnf install codium
+```
+
+### Windows
+Download from: https://vscodium.com/
+
+---
+
+## Part 2: Adding SSH Keys to Agent (Universal Method)
+
+This ensures VSCodium can use your SSH keys regardless of filename.
+
+### On macOS
+
+```bash
+# Start SSH agent
+eval "$(ssh-agent -s)"
+
+# Add your key (use your actual key filename)
+ssh-add ~/.ssh/hpc_key
+
+# Make it persistent across reboots
+# Add to ~/.zshrc (or ~/.bash_profile if using bash)
+echo 'if [ -z "$SSH_AUTH_SOCK" ]; then' >> ~/.zshrc
+echo '   eval "$(ssh-agent -s)"' >> ~/.zshrc
+echo '   ssh-add ~/.ssh/hpc_key 2>/dev/null' >> ~/.zshrc
+echo 'fi' >> ~/.zshrc
+
+# For macOS, also use Keychain (stores passphrase)
+ssh-add --apple-use-keychain ~/.ssh/hpc_key
+
+# Add to ~/.ssh/config
+cat >> ~/.ssh/config << 'EOF'
+Host *
+    UseKeychain yes
+    AddKeysToAgent yes
+EOF
+```
+
+### On Linux
+
+```bash
+# Start SSH agent
+eval "$(ssh-agent -s)"
+
+# Add your key
+ssh-add ~/.ssh/hpc_key
+
+# Make it persistent
+# Add to ~/.bashrc
+echo 'if [ -z "$SSH_AUTH_SOCK" ]; then' >> ~/.bashrc
+echo '   eval "$(ssh-agent -s)"' >> ~/.bashrc
+echo '   ssh-add ~/.ssh/hpc_key 2>/dev/null' >> ~/.bashrc
+echo 'fi' >> ~/.bashrc
+
+# Reload
+source ~/.bashrc
+```
+
+### On Windows (PowerShell)
+
+```powershell
+# Start SSH agent service (one-time setup)
+Get-Service ssh-agent | Set-Service -StartupType Automatic
+Start-Service ssh-agent
+
+# Add your key
+ssh-add ~\.ssh\hpc_key
+
+# Verify
+ssh-add -l
+```
+
+### Verify Key is Loaded
+
+```bash
+# List keys in agent
+ssh-add -l
+
+# You should see your key listed
+# Example output:
+# 256 SHA256:xxx...xxx your.email@domain.com (ED25519)
+```
+
+---
+
+## Part 3: VSCodium Remote-SSH Setup
+
+### Install Remote-SSH Extension
+
+**Method 1: Via GUI**
+1. Open VSCodium
+2. Click Extensions icon (left sidebar) or press `Ctrl+Shift+X`
+3. Search for "Remote - SSH"
+4. Install "Remote - SSH" by Microsoft
+5. Also install "Remote - SSH: Editing Configuration Files"
+
+**Method 2: Via Command Line**
+```bash
+codium --install-extension ms-vscode-remote.remote-ssh
+```
+
+---
+
+## Part 4: Configure SSH Connection
+
+### Option A: Using SSH Config File (RECOMMENDED)
+
+VSCodium reads from `~/.ssh/config`:
+
+```bash
+# Edit your SSH config
+nano ~/.ssh/config
+```
+
+Add/update your HPC configuration:
+
+```
+Host hpc
+    HostName hpc.institution.edu
+    User your_username
+    IdentityFile ~/.ssh/hpc_key
+    IdentitiesOnly yes
+    
+    # Connection stability
+    ServerAliveInterval 30
+    ServerAliveCountMax 120
+    TCPKeepAlive yes
+    
+    # Connection multiplexing (faster reconnection)
+    ControlMaster auto
+    ControlPath ~/.ssh/control-%r@%h:%p
+    ControlPersist 10m
+    
+    # Performance
+    Compression yes
+    
+    # Forward agent (use keys on compute nodes)
+    ForwardAgent yes
+```
+
+### Option B: Add Host Directly in VSCodium
+
+1. Press `F1` or `Ctrl+Shift+P`
+2. Type: `Remote-SSH: Add New SSH Host`
+3. Enter: `ssh hpc` (if you have config) or `ssh username@hpc.institution.edu`
+4. Select config file to update (usually `~/.ssh/config`)
+
+---
+
+## Part 5: Configure VSCodium Settings
+
+Press `F1` → `Preferences: Open Settings (JSON)`
+
+Add these settings:
+
+```json
+{
+    // Remote SSH settings
+    "remote.SSH.configFile": "~/.ssh/config",
+    "remote.SSH.showLoginTerminal": true,
+    "remote.SSH.enableAgentForwarding": true,
+    "remote.SSH.connectTimeout": 60,
+    "remote.SSH.maxReconnectionAttempts": 10,
+    
+    // Editor settings
+    "editor.fontSize": 14,
+    "editor.tabSize": 4,
+    "editor.rulers": [80, 120],
+    "files.autoSave": "afterDelay",
+    "files.autoSaveDelay": 1000,
+    
+    // Terminal settings
+    "terminal.integrated.fontSize": 13,
+    "terminal.integrated.scrollback": 10000,
+    
+    // Python settings (if using Python)
+    "python.defaultInterpreterPath": "~/miniforge3/envs/jupyter/bin/python",
+    
+    // Git settings
+    "git.enableSmartCommit": true,
+    "git.confirmSync": false
+}
+```
+
+---
+
+## Part 6: First Connection
+
+### Connect to HPC
+
+1. Press `F1` → `Remote-SSH: Connect to Host`
+2. Select `hpc` from the list
+3. Enter 2FA code if prompted
+4. Wait for VSCodium to install server components (first time only)
+5. Once connected, you'll see "SSH: hpc" in the bottom-left corner
+
+### What Happens on First Connection
+
+VSCodium installs a server on the HPC:
+- Location: `~/.vscode-server/`
+- Takes 1-2 minutes
+- Only happens once
+- Requires internet on HPC
+
+---
+
+## Part 7: Essential Extensions for HPC
+
+After connecting to HPC, install these extensions:
+
+### Core Extensions
+
+```bash
+# Python development
+codium --install-extension ms-python.python
+codium --install-extension ms-python.vscode-pylance
+
+# R development
+codium --install-extension REditorSupport.r
+
+# Julia development
+codium --install-extension julialang.language-julia
+
+# MATLAB support
+codium --install-extension mathworks.language-matlab
+
+# Jupyter notebooks
+codium --install-extension ms-toolsai.jupyter
+
+# SLURM syntax
+codium --install-extension tojapierr.slurm-syntax
+
+# Git integration
+codium --install-extension eamodio.gitlens
+
+# Remote development
+codium --install-extension ms-vscode-remote.remote-ssh-edit
+```
+
+### Install via GUI
+
+1. Connect to HPC
+2. Click Extensions (left sidebar)
+3. Search for extension name
+4. Click "Install in SSH: hpc"
+
+---
+
+## Part 8: Working with tmux for Persistence
+
+### Why tmux?
+
+If your connection drops, tmux preserves your session:
+- Terminals stay open
+- Running processes continue
+- Reconnect and resume exactly where you left off
+
+### Basic tmux Workflow
+
+```bash
+# After connecting via VSCodium, open terminal
+# Press Ctrl+` or View → Terminal
+
+# Start new tmux session
+tmux new -s work
+
+# Your terminal is now in tmux
+# Work normally: activate conda, edit files, run jobs
+
+# If connection drops:
+# Reconnect to HPC in VSCodium
+# Open terminal
+# Reattach to session
+tmux attach -s work
+
+# Everything is exactly as you left it!
+```
+
+### tmux Quick Reference
+
+```bash
+# Create new session
+tmux new -s session_name
+
+# Detach from session (keeps it running)
+Ctrl+b, then d
+
+# List sessions
+tmux ls
+
+# Attach to session
+tmux attach -t session_name
+
+# Kill session
+tmux kill-session -t session_name
+
+# Switch between windows (if you create multiple)
+Ctrl+b, then 0-9
+```
+
+### Recommended ~/.tmux.conf
+
+```bash
+# On HPC, create/edit ~/.tmux.conf
+cat > ~/.tmux.conf << 'EOF'
+# Change prefix from Ctrl+b to Ctrl+a (easier to reach)
+set -g prefix C-a
+unbind C-b
+bind C-a send-prefix
+
+# Enable mouse support
+set -g mouse on
+
+# Better colors
+set -g default-terminal "screen-256color"
+
+# Status bar
+set -g status-style bg=colour235,fg=colour136
+set -g status-left '#[fg=colour235,bg=colour136,bold] #S '
+
+# Start window numbering at 1
+set -g base-index 1
+setw -g pane-base-index 1
+
+# Reload config
+bind r source-file ~/.tmux.conf \; display "Config reloaded!"
+
+# Split panes with | and -
+bind | split-window -h
+bind - split-window -v
+EOF
+```
+
+---
+
+## Part 9: Typical Development Workflow
+
+### Daily Workflow
+
+```bash
+# 1. Open VSCodium
+# 2. F1 → Remote-SSH: Connect to Host → hpc
+# 3. Approve 2FA
+# 4. Open terminal (Ctrl+`)
+# 5. Start or reattach tmux
+tmux attach -t work || tmux new -s work
+
+# 6. Activate your environment
+mamba activate myproject
+
+# 7. Open your project folder
+# File → Open Folder → /home/username/projects/myproject
+
+# 8. Start working!
+```
+
+### Working with Files
+
+```python
+# VSCodium has full IDE features:
+
+# - IntelliSense/autocomplete
+# - Go to definition (F12)
+# - Find all references (Shift+F12)
+# - Rename symbol (F2)
+# - Format document (Shift+Alt+F)
+# - Multi-cursor editing (Alt+Click)
+# - Split editor (Ctrl+\)
+```
+
+### Interactive Python/R/Julia
+
+VSCodium supports interactive execution:
+
+#### Python Interactive Window
+
+```python
+# In any .py file, add cell markers: # %%
+
+# %%
+import numpy as np
+x = np.random.rand(100)
+print(x.mean())
+
+# %%
+import matplotlib.pyplot as plt
+plt.plot(x)
+plt.show()
+
+# Press Shift+Enter to run cell
+# Results appear in Interactive Window (like Jupyter)
+```
+
+#### R Interactive Execution
+
+```r
+# In any .R file
+x <- rnorm(100)
+mean(x)
+
+# Highlight code and press Ctrl+Enter
+# Sends to R terminal
+```
+
+### Working with Notebooks
+
+VSCodium can open `.ipynb` files directly:
+
+1. Open any `.ipynb` file
+2. Select kernel (Python, R, Julia, MATLAB)
+3. Run cells with Shift+Enter
+4. All Jupyter features work
+
+**Advantages over browser Jupyter:**
+- No SSH tunnel needed
+- More stable
+- Better code completion
+- Git integration
+- Can edit multiple files simultaneously
+
+---
+
+## Part 10: Submitting SLURM Jobs
+
+```bash
+# In VSCodium terminal
+
+# Edit your job script
+nano submit_job.sh
+
+# Submit
+sbatch submit_job.sh
+
+# Monitor
+squeue -u $USER
+
+# View output (tail updates live)
+tail -f job_output_12345.out
+
+# Cancel if needed
+scancel 12345
+```
+
+---
+
+## Part 11: Git Integration
+
+VSCodium has excellent Git support:
+
+### Basic Git Workflow
+
+```bash
+# In terminal, clone your repo
+git clone git@github.com:username/project.git
+cd project
+
+# Or initialize new repo
+git init
+git remote add origin git@github.com:username/project.git
+```
+
+### Using VSCodium's Git Features
+
+1. **Source Control Panel** (Ctrl+Shift+G)
+   - See changed files
+   - Stage changes (click +)
+   - Commit (Ctrl+Enter)
+   - Push/Pull
+
+2. **GitLens Extension**
+   - See who changed each line
+   - View file history
+   - Compare revisions
+
+3. **Integrated Terminal**
+   - Run any git command
+   - Full git functionality
+
+---
+
+## Part 12: Troubleshooting
+
+### "Could not establish connection to hpc"
+
+```bash
+# 1. Test basic SSH
+ssh hpc
+# Does this work?
+
+# 2. Check if key is in agent
+ssh-add -l
+
+# 3. Try adding key again
+ssh-add ~/.ssh/hpc_key
+
+# 4. Check VSCodium logs
+# View → Output → Select "Remote - SSH"
+```
+
+### "Permission denied (publickey)"
+
+```bash
+# 1. Verify key is in agent
+ssh-add -l
+
+# 2. Re-add key
+ssh-add ~/.ssh/hpc_key
+
+# 3. Test SSH directly
+ssh -v hpc
+
+# 4. Check IdentitiesOnly in config
+# Should be: IdentitiesOnly yes
+```
+
+### Connection Keeps Dropping
+
+```bash
+# 1. Use tmux (preserves work if connection drops)
+tmux new -s work
+
+# 2. Check SSH keepalive settings in ~/.ssh/config
+ServerAliveInterval 30
+ServerAliveCountMax 120
+
+# 3. Check network stability
+# May need VPN if off-campus
+```
+
+### VSCodium Server Won't Install
+
+```bash
+# On HPC, remove old server
+rm -rf ~/.vscode-server
+
+# Reconnect from VSCodium
+# Will reinstall fresh
+```
+
+### Extensions Won't Install
+
+```bash
+# Ensure you're installing on HPC, not locally
+# Extensions panel should show "SSH: hpc" at top
+
+# Check disk space on HPC
+df -h ~
+
+# Check quota
+quota -s
+```
+
+---
+
+## Part 13: Keyboard Shortcuts
+
+### Essential Shortcuts
+
+```
+F1 or Ctrl+Shift+P    Command Palette
+Ctrl+`                Toggle Terminal
+Ctrl+Shift+E          Explorer
+Ctrl+Shift+F          Search
+Ctrl+Shift+G          Source Control
+Ctrl+Shift+X          Extensions
+
+Ctrl+P                Quick Open File
+Ctrl+Shift+N          New Window
+Ctrl+W                Close Tab
+
+Ctrl+/                Toggle Comment
+Ctrl+Shift+K          Delete Line
+Alt+Up/Down           Move Line
+Shift+Alt+Up/Down     Copy Line
+
+F12                   Go to Definition
+Shift+F12             Find References
+F2                    Rename Symbol
+
+Ctrl+\                Split Editor
+Ctrl+1/2/3            Focus Editor Group
+```
+
+---
+
+## Part 14: Pro Tips
+
+### 1. Use Workspace Settings
+
+Save project-specific settings:
+
+```bash
+# In your project folder on HPC
+mkdir -p .vscode
+nano .vscode/settings.json
+```
+
+```json
+{
+    "python.defaultInterpreterPath": "~/miniforge3/envs/myproject/bin/python",
+    "python.linting.enabled": true,
+    "python.formatting.provider": "black",
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/*.pyc": true
+    }
+}
+```
+
+### 2. Create Tasks for Common Operations
+
+```bash
+# .vscode/tasks.json
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Submit SLURM Job",
+            "type": "shell",
+            "command": "sbatch ${file}",
+            "problemMatcher": []
+        },
+        {
+            "label": "Check Queue",
+            "type": "shell",
+            "command": "squeue -u $USER",
+            "problemMatcher": []
+        }
+    ]
+}
+```
+
+Run with: `Ctrl+Shift+B`
+
+### 3. Use Snippets
+
+Create custom code snippets:
+- `F1` → `Preferences: Configure User Snippets`
+- Select language
+- Add your snippets
+
+### 4. Sync Settings (Optional)
+
+Install "Settings Sync" extension to sync settings across machines.
+
+---
+
+## Summary: Complete Setup Checklist
+
+- [ ] VSCodium installed
+- [ ] SSH key added to agent (`ssh-add -l` shows key)
+- [ ] `~/.ssh/config` configured
+- [ ] SSH connection tested (`ssh hpc` works)
+- [ ] Remote-SSH extension installed
+- [ ] Connected to HPC in VSCodium
+- [ ] Essential extensions installed on HPC
+- [ ] tmux configured on HPC
+- [ ] Tested opening files and running code
+- [ ] Git configured and tested
+
+You're now ready for productive HPC development with VSCodium!

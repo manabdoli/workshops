@@ -1,0 +1,563 @@
+---
+title: "4. Moving Data Between Local Machine and HPC"
+format: html
+---
+
+# Moving Data Between Local Machine and HPC
+
+## Overview
+This guide covers efficient methods for transferring data between your local machine and HPC, from small files to massive datasets.
+
+---
+
+## Part 1: Choose the Right Tool
+
+| Tool | Best For | Speed | Resume | Complexity |
+|------|----------|-------|--------|------------|
+| **rsync** | Most situations | Fast | ✅ Yes | Easy |
+| **scp** | One-time small transfers | Medium | ❌ No | Easiest |
+| **Globus** | 100GB+ datasets | Very Fast | ✅ Yes | Medium |
+| **rclone** | Cloud integration | Fast | ✅ Yes | Medium |
+| **SSHFS** | Browse files | Slow | N/A | Easy |
+
+---
+
+## Part 2: rsync (RECOMMENDED)
+
+### Why rsync?
+
+- ✅ Only transfers changed files (incremental)
+- ✅ Can resume interrupted transfers
+- ✅ Preserves timestamps and permissions
+- ✅ Shows progress
+- ✅ Can exclude files/folders
+- ✅ Dry-run mode to preview
+
+### Basic Usage
+
+```bash
+# Upload: Local → HPC
+rsync -avzP /local/path/data/ username@hpc.institution.edu:~/data/
+
+# Download: HPC → Local
+rsync -avzP username@hpc.institution.edu:~/results/ /local/results/
+
+# Using SSH alias from config
+rsync -avzP /local/data/ hpc:~/data/
+```
+
+**Flags explained:**
+- `-a`: Archive (preserves permissions, timestamps, symlinks)
+- `-v`: Verbose (show files being transferred)
+- `-z`: Compress during transfer
+- `-P`: Show progress + keep partial files (for resuming)
+
+### Advanced Options
+
+```bash
+# Dry run (see what would be transferred)
+rsync -avzPn /local/data/ hpc:~/data/
+
+# Exclude files/folders
+rsync -avzP --exclude='*.tmp' --exclude='cache/' /local/data/ hpc:~/data/
+
+# Only include certain files
+rsync -avzP --include='*.csv' --include='*/' --exclude='*' /local/data/ hpc:~/data/
+
+# Delete files on destination that don't exist locally
+rsync -avzP --delete /local/data/ hpc:~/data/
+
+# Limit bandwidth (in KB/s)
+rsync -avzP --bwlimit=5000 /local/data/ hpc:~/data/
+
+# Resume interrupted transfer
+rsync -avzP --partial /local/data/ hpc:~/data/
+```
+
+### Common Patterns
+
+#### Upload raw data once
+
+```bash
+# Initial upload
+rsync -avzP /local/datasets/raw/ hpc:~/project/data/raw/
+
+# Make read-only on HPC
+ssh hpc "chmod -R a-w ~/project/data/raw/"
+```
+
+#### Sync results back regularly
+
+```bash
+# Download only new/changed results
+rsync -avzP hpc:~/project/results/ /local/project/results/
+```
+
+#### Sync code changes (though Git is better)
+
+```bash
+# Upload code changes
+rsync -avzP --exclude='*.pyc' --exclude='__pycache__' \
+    /local/project/scripts/ hpc:~/project/scripts/
+```
+
+#### Mirror entire directory
+
+```bash
+# Exact mirror (adds --delete)
+rsync -avzP --delete /local/project/ hpc:~/project/
+```
+
+---
+
+## Part 3: scp (Simple Copy)
+
+### When to Use
+
+- One-time transfers
+- Small files
+- Don't need resume capability
+
+### Basic Usage
+
+```bash
+# Upload file
+scp /local/file.csv username@hpc.institution.edu:~/data/
+
+# Upload directory
+scp -r /local/directory/ username@hpc.institution.edu:~/data/
+
+# Download file
+scp username@hpc.institution.edu:~/results/output.csv /local/results/
+
+# Download directory
+scp -r username@hpc.institution.edu:~/results/ /local/results/
+
+# Using SSH alias
+scp /local/file.csv hpc:~/data/
+scp -r hpc:~/results/ /local/
+```
+
+### Multiple Files
+
+```bash
+# Upload multiple files
+scp file1.csv file2.csv file3.csv hpc:~/data/
+
+# Download with wildcards
+scp hpc:~/results/*.csv /local/results/
+
+# Copy between two HPCs (if you have access)
+scp hpc1:~/data/file.csv hpc2:~/data/
+```
+
+---
+
+## Part 4: Globus (For Very Large Datasets)
+
+### When to Use
+
+- Datasets 100GB+
+- Multi-TB transfers
+- Need reliability over days
+- Institutional data sharing
+
+### Setup
+
+1. **Create Globus account**: https://www.globus.org/
+2. **Set up endpoints**:
+   - HPC: Usually pre-configured by institution
+   - Local: Install Globus Connect Personal
+
+### Using Globus Web Interface
+
+```bash
+# 1. Login to https://www.globus.org/
+# 2. Go to File Manager
+# 3. Select source endpoint (e.g., your HPC)
+# 4. Select destination endpoint (e.g., your laptop)
+# 5. Select files/folders
+# 6. Click "Start" transfer
+# 7. Get email when complete
+```
+
+### Benefits
+
+- ✅ Automatic retry on failure
+- ✅ Scheduled transfers
+- ✅ Transfers continue even if you close browser
+- ✅ Very fast for large files
+- ✅ Can share data with collaborators
+
+### Globus Command Line
+
+```bash
+# Install Globus CLI
+pip install globus-cli
+
+# Login
+globus login
+
+# List your endpoints
+globus endpoint search --filter-scope my-endpoints
+
+# Transfer
+globus transfer \
+    source-endpoint:/path/to/source/ \
+    destination-endpoint:/path/to/dest/ \
+    --recursive
+
+# Monitor transfer
+globus task list
+```
+
+---
+
+## Part 5: rclone (Cloud Integration)
+
+### When to Use
+
+- Sync with cloud storage (Google Drive, Dropbox, S3)
+- Backup HPC data to cloud
+- Share data with collaborators via cloud
+
+### Setup
+
+```bash
+# Install on local machine
+# macOS
+brew install rclone
+
+# Linux
+curl https://rclone.org/install.sh | sudo bash
+
+# Configure
+rclone config
+# Follow prompts to add cloud provider
+```
+
+### Common Usage
+
+```bash
+# List configured remotes
+rclone listremotes
+
+# Copy from HPC to Google Drive
+# First, set up rclone on HPC
+ssh hpc
+curl https://rclone.org/install.sh | bash
+rclone config
+# ... configure Google Drive as "gdrive"
+
+# Copy to cloud
+rclone copy ~/project/results gdrive:project_backup
+
+# Sync (only copy changes)
+rclone sync ~/project/results gdrive:project_backup
+
+# From cloud to local
+rclone copy gdrive:shared_dataset /local/data/
+```
+
+### Useful Options
+
+```bash
+# Dry run
+rclone copy --dry-run source dest
+
+# Show progress
+rclone copy -P source dest
+
+# Only files newer than
+rclone copy --min-age 24h source dest
+
+# Exclude patterns
+rclone copy --exclude "*.tmp" source dest
+```
+
+---
+
+## Part 6: SSHFS (Mount HPC as Drive)
+
+### When to Use
+
+- Browse files visually
+- Quick edits
+- **NOT for large transfers** (slow)
+
+### Setup
+
+```bash
+# Install SSHFS
+# macOS
+brew install macfuse sshfs
+
+# Linux (Ubuntu/Debian)
+sudo apt-get install sshfs
+
+# Linux (Fedora)
+sudo dnf install sshfs
+```
+
+### Usage
+
+```bash
+# Create mount point
+mkdir -p ~/hpc_mount
+
+# Mount HPC home directory
+sshfs username@hpc.institution.edu:/home/username ~/hpc_mount
+
+# Or using SSH config alias
+sshfs hpc:/home/username ~/hpc_mount
+
+# Now browse like local folder
+cd ~/hpc_mount
+ls -la
+
+# Unmount when done
+umount ~/hpc_mount
+# Or on macOS:
+diskutil unmount ~/hpc_mount
+```
+
+### Mount Options
+
+```bash
+# Mount with better performance
+sshfs hpc:/home/username ~/hpc_mount \
+    -o auto_cache,reconnect,defer_permissions,noappledouble
+
+# Mount read-only
+sshfs hpc:/home/username ~/hpc_mount -o ro
+
+# Mount with compression
+sshfs hpc:/home/username ~/hpc_mount -o compression=yes
+```
+
+---
+
+## Part 7: Efficient Data Management Strategies
+
+### 1. Organize Data in Tiers
+
+```bash
+# On HPC, use appropriate storage
+~/                          # Small files, code (50-100GB)
+/scratch/$USER/            # Active computation (1-5TB, purged)
+/project/groupname/        # Shared data (TB+, longer retention)
+/archive/                  # Long-term storage (unlimited, slow)
+```
+
+### 2. Upload Raw Data Once
+
+```bash
+# Upload large raw datasets ONCE
+rsync -avzP /local/raw_data/ hpc:~/project/data/raw/
+
+# On HPC, make read-only
+ssh hpc "chmod -R a-w ~/project/data/raw/"
+
+# Process in scratch
+ssh hpc "cp -r ~/project/data/raw/* /scratch/$USER/project/"
+```
+
+### 3. Download Only What You Need
+
+```bash
+# Don't download entire results folder
+# Download specific files
+rsync -avzP hpc:~/project/results/summary.csv /local/
+rsync -avzP hpc:~/project/results/figures/ /local/figures/
+
+# Or use patterns
+rsync -avzP --include='*.png' --include='*.pdf' --exclude='*' \
+    hpc:~/project/results/ /local/results/
+```
+
+### 4. Compress Before Transfer
+
+```bash
+# On HPC, compress large datasets
+ssh hpc
+tar -czf results.tar.gz results/
+exit
+
+# Download compressed file
+rsync -avzP hpc:~/results.tar.gz /local/
+
+# Extract locally
+tar -xzf results.tar.gz
+
+# Or stream (compress and transfer simultaneously)
+ssh hpc "tar -czf - results/" | tar -xzf - -C /local/
+```
+
+### 5. Incremental Backups
+
+```bash
+# Regular incremental sync
+# Only transfers new/changed files
+rsync -avzP --backup --backup-dir=../backup-$(date +%Y%m%d) \
+    hpc:~/project/ /local/project/
+```
+
+---
+
+## Part 8: Automation Scripts
+
+### Daily Results Sync
+
+Save as `~/bin/sync_results.sh`:
+
+```bash
+#!/bin/bash
+# Daily sync script for project results
+
+PROJECT="myproject"
+DATE=$(date +%Y%m%d_%H%M%S)
+LOGDIR="$HOME/sync_logs"
+mkdir -p $LOGDIR
+
+echo "[$DATE] Syncing $PROJECT results..." | tee -a $LOGDIR/sync.log
+
+rsync -avzP --log-file=$LOGDIR/sync_$DATE.log \
+    hpc:~/projects/$PROJECT/results/ \
+    ~/local_projects/$PROJECT/results/
+
+echo "[$DATE] Sync complete!" | tee -a $LOGDIR/sync.log
+```
+
+```bash
+# Make executable
+chmod +x ~/bin/sync_results.sh
+
+# Run manually
+~/bin/sync_results.sh
+
+# Or schedule with cron (run daily at 6pm)
+crontab -e
+# Add: 0 18 * * * ~/bin/sync_results.sh
+```
+
+### Monitor Transfer Progress
+
+Save as `~/bin/watch_transfer.sh`:
+
+```bash
+#!/bin/bash
+# Monitor rsync transfer progress
+
+PID=$1
+if [ -z "$PID" ]; then
+    echo "Usage: $0 <rsync_pid>"
+    echo ""
+    echo "Run rsync in background first:"
+    echo "  rsync -avzP /local/data/ hpc:~/data/ &"
+    echo "  ./watch_transfer.sh \$!"
+    exit 1
+fi
+
+while kill -0 $PID 2>/dev/null; do
+    clear
+    echo "Transfer in progress (PID: $PID)"
+    echo "==================================="
+    ps -p $PID -o %cpu,%mem,etime,cmd
+    echo ""
+    echo "Press Ctrl+C to stop watching (transfer continues)"
+    sleep 5
+done
+
+echo "Transfer complete!"
+```
+
+```bash
+chmod +x ~/bin/watch_transfer.sh
+```
+
+### Backup to Multiple Locations
+
+Save as `~/bin/backup_project.sh`:
+
+```bash
+#!/bin/bash
+# Backup project to multiple locations
+
+PROJECT="myproject"
+DATE=$(date +%Y%m%d)
+
+echo "Starting backup: $DATE"
+
+# Backup to external drive
+echo "Backing up to external drive..."
+rsync -avzP ~/projects/$PROJECT/ /Volumes/Backup/projects/$PROJECT/
+
+# Backup to cloud (if rclone configured)
+echo "Backing up to cloud..."
+rclone sync ~/projects/$PROJECT/ gdrive:backups/$PROJECT/
+
+# Archive compressed version
+echo "Creating archive..."
+tar -czf ~/archives/${PROJECT}_${DATE}.tar.gz ~/projects/$PROJECT/
+
+echo "Backup complete: $DATE"
+```
+
+```bash
+chmod +x ~/bin/backup_project.sh
+```
+
+---
+
+## Part 9: Troubleshooting
+
+### Transfer is Slow
+
+```bash
+# 1. Check network speed
+ssh hpc "dd if=/dev/zero bs=1M count=100" | dd of=/dev/null
+# Shows transfer rate
+
+# 2. Use compression
+rsync -avzP /local/data/ hpc:~/data/  # -z enables compression
+
+# 3. Reduce encryption overhead (less secure!)
+rsync -avzP -e "ssh -c aes128-ctr" /local/data/ hpc:~/data/
+
+# 4. Use parallel transfers (for many small files)
+# Install GNU parallel first
+parallel -j 4 rsync -avzP {} hpc:~/data/ ::: file1 file2 file3 file4
+```
+
+### Transfer Interrupted
+
+```bash
+# rsync can resume
+rsync -avzP --partial /local/data/ hpc:~/data/
+
+# For scp, restart from scratch
+# Consider using rsync instead
+```
+
+### Permission Denied
+
+```bash
+# Check permissions on destination
+ssh hpc "ls -la ~/data/"
+
+# Create directory if needed
+ssh hpc "mkdir -p ~/data/"
+
+# Check disk quota
+ssh hpc "quota -s"
+```
+
+### Out of Disk Space
+
+```bash
+# Check space on HPC
+ssh hpc "df -h ~"
+ssh hpc "du -sh ~/* | sort -rh | head -20"
+
+# Clean up
+ssh hpc "rm -rf /scratch/$
