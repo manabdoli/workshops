@@ -1,6 +1,9 @@
 ---
 title: "Using Jupyter Notebook with Anaconda Environment"
-format: html
+format: 
+  html:
+    toc: true
+    toc_float: true
 execute:
   engine: knitr
 ---

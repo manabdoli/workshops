@@ -1,0 +1,80 @@
+---
+title: "hpc_workflow_guide2_explanation"
+format: 
+  html:
+    toc: true
+    toc_float: true
+
+---
+
+Great questions! Let me help you set up MATLAB and R kernels in JupyterLab, and then configure VSCodium for a more stable remote connection.Perfect! I've updated the guide with comprehensive sections on:
+
+## **Key Additions:**
+
+### **1. MATLAB in JupyterLab**
+Three options:
+- **jupyter-matlab-proxy** (easiest): Gives you MATLAB interface in browser
+- **MATLAB Engine API**: For programmatic access
+- **imatlab kernel**: Full MATLAB kernel (if you have permissions)
+
+### **2. R in JupyterLab**
+Very straightforward:
+```bash
+mamba activate jupyter
+mamba install r-irkernel r-essentials
+# Done! R kernel appears in Jupyter
+```
+
+### **3. RStudio Server**
+I included a SLURM launch script similar to JupyterLab, or you can check if your HPC has Open OnDemand (web portal with RStudio built-in).
+
+### **4. VSCodium Setup (Recommended!)**
+This solves your disconnection problem:
+- **More stable** than browser-based Jupyter
+- **Auto-reconnects** if network hiccups
+- **No SSH tunnel needed** - direct connection
+- **Full IDE features** - debugging, git, etc.
+- **Can still use notebooks** - opens `.ipynb` files natively
+
+### **5. Preventing Disconnections**
+Three key strategies:
+- **tmux** on HPC (work survives disconnects)
+- **Better SSH config** (keepalive settings)
+- **Connection multiplexing** (faster reconnects)
+
+## **My Recommended Setup:**
+
+1. **Primary: VSCodium with Remote-SSH**
+   - Most stable for daily work
+   - Works with Python, R, MATLAB, Julia
+   - Opens notebooks directly
+
+2. **Secondary: JupyterLab**
+   - For presentation/sharing notebooks
+   - When you specifically need Jupyter widgets
+
+3. **Always: tmux**
+   - Run on HPC: `tmux new -s work`
+   - If disconnected: `tmux attach -s work`
+   - Everything preserved!
+
+## **Quick Start:**
+
+```bash
+# Setup R kernel
+mamba activate jupyter
+mamba install r-irkernel r-essentials
+
+# Setup MATLAB (if available)
+pip install jupyter-matlab-proxy
+
+# Test
+jupyter kernelspec list
+
+# Install VSCodium on your laptop
+# Connect via Remote-SSH to HPC
+# Start tmux session
+# Work without worrying about disconnects!
+```
+
+Would you like me to help you with any specific part, like configuring MATLAB or setting up your first VSCodium connection?

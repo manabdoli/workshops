@@ -1,0 +1,1157 @@
+---
+title: "HPC Workflow Guide: Development Environment and Data Management"
+format: 
+  html:
+    toc: true
+    toc_float: true
+---
+
+## 1. Recommended Development Setup
+
+### Option A: VS Code with Remote-SSH (RECOMMENDED)
+**Best for: Python, R, Julia, general coding**
+
+#### Setup:
+```bash
+# On your local machine:
+# 1. Install VS Code
+# 2. Install "Remote - SSH" extension
+# 3. Configure SSH connection
+
+# In VS Code, press F1 and select "Remote-SSH: Connect to Host"
+# Add your HPC: user@hpc.institution.edu
+```
+
+#### SSH Config (~/.ssh/config):
+```
+Host hpc
+    HostName hpc.institution.edu
+    User your_username
+    ForwardAgent yes
+    ServerAliveInterval 60
+    ServerAliveCountMax 10
+```
+
+#### Essential VS Code Extensions for HPC:
+- **Remote - SSH**: Connect to HPC
+- **Python**: IntelliSense, debugging
+- **R**: R language support
+- **Julia**: Julia language support
+- **SLURM Syntax Highlighting**: For job scripts
+- **GitLens**: Git integration
+- **Remote Explorer**: Manage connections
+
+#### Benefits:
+- Edit files directly on HPC with full IDE features
+- IntelliSense and autocomplete work with HPC libraries
+- Integrated terminal for running commands
+- Git integration
+- Debug Python code remotely
+- Split editor for multiple files
+
+---
+
+### Option B: JupyterLab on HPC with SSH Tunneling
+**Best for: Interactive Python/R/Julia work, data exploration**
+
+#### Setup JupyterLab on HPC:
+```bash
+# On HPC, in your virtual environment
+pip install jupyterlab jupyter-server-proxy
+
+# Or load HPC module
+module load jupyterlab
+```
+
+#### Create Launch Script (~/launch_jupyter.sh):
+```bash
+#!/bin/bash
+#SBATCH --job-name=jupyter
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
+#SBATCH --time=08:00:00
+#SBATCH --output=jupyter_%j.out
+
+# Get the compute node name
+NODE=$(hostname -s)
+PORT=8888
+
+echo "Starting Jupyter on $NODE:$PORT"
+echo "SSH tunnel command:"
+echo "ssh -N -L ${PORT}:${NODE}:${PORT} ${USER}@hpc.institution.edu"
+
+# Activate environment
+source ~/hpc_test_env/bin/activate
+
+# Start Jupyter
+jupyter lab --no-browser --port=${PORT} --ip=${NODE}
+```
+
+#### Usage:
+```bash
+# Submit job
+sbatch launch_jupyter.sh
+
+# Check output for connection info
+cat jupyter_<job_id>.out
+
+# On local machine, create tunnel (use the command from output)
+ssh -N -L 8888:compute-node-15:8888 user@hpc.institution.edu
+
+# Open browser to: localhost:8888
+```
+
+---
+
+### Option C: Terminal-Based Editors
+**Best for: Quick edits, job scripts, when graphical interface unavailable**
+
+#### Vim (Learning curve, but powerful):
+```bash
+# Essential Vim commands
+vim filename.py
+i               # Enter insert mode
+ESC             # Exit insert mode
+:w              # Save
+:q              # Quit
+:wq             # Save and quit
+dd              # Delete line
+yy              # Copy line
+p               # Paste
+/search         # Search
+:set number     # Show line numbers
+```
+
+#### Nano (Easier for beginners):
+```bash
+nano filename.py
+# Ctrl+O: Save
+# Ctrl+X: Exit
+# Ctrl+W: Search
+# Ctrl+K: Cut line
+# Ctrl+U: Paste
+```
+
+#### Basic .vimrc for HPC (~/.vimrc):
+```vim
+syntax on
+set number
+set tabstop=4
+set shiftwidth=4
+set expandtab
+set autoindent
+colorscheme desert
+```
+
+---
+
+## 2. Git Workflow for Code (Not Data)
+
+### Setup on HPC:
+```bash
+# Configure Git
+git config --global user.name "Your Name"
+git config --global user.email "your.email@domain.com"
+
+# Setup SSH key for GitHub
+ssh-keygen -t ed25519 -C "your.email@domain.com"
+cat ~/.ssh/id_ed25519.pub
+# Copy this key to GitHub: Settings > SSH and GPG keys
+```
+
+### Recommended Repository Structure:
+```
+project/
+├── .gitignore           # Exclude data and results
+├── README.md
+├── environment.yml      # Conda environment
+├── requirements.txt     # Python packages
+├── scripts/
+│   ├── preprocessing.py
+│   ├── analysis.py
+│   └── visualization.R
+├── slurm_jobs/
+│   ├── submit_preprocess.sh
+│   └── submit_analysis.sh
+├── notebooks/          # Jupyter notebooks
+│   └── exploration.ipynb
+└── config/
+    └── parameters.yaml
+```
+
+### Essential .gitignore:
+```
+# Data files - DO NOT COMMIT
+*.csv
+*.tsv
+*.h5
+*.hdf5
+*.npy
+*.npz
+*.rds
+*.RData
+*.mat
+data/
+raw_data/
+processed_data/
+results/
+outputs/
+
+# Large model files
+*.pkl
+*.joblib
+*.pth
+*.pt
+*.ckpt
+models/
+
+# Job outputs
+*.out
+*.err
+slurm-*.out
+
+# Environment
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+env/
+```
+
+### Typical Git Workflow:
+```bash
+# Clone on HPC
+git clone git@github.com:username/project.git
+cd project
+
+# Make changes
+vim scripts/analysis.py
+
+# Commit and push
+git add scripts/analysis.py
+git commit -m "Update analysis script"
+git push
+
+# Pull changes from another machine
+git pull
+```
+
+---
+
+## 3. Data Transfer Methods
+
+### Method 1: rsync (BEST for large datasets)
+**Use for: Initial data upload, incremental updates**
+
+```bash
+# Basic usage - local to HPC
+rsync -avzP /local/path/to/data/ user@hpc.institution.edu:~/project/data/
+
+# HPC to local
+rsync -avzP user@hpc.institution.edu:~/project/results/ /local/results/
+
+# With exclusions
+rsync -avzP --exclude='*.tmp' --exclude='cache/' /local/data/ user@hpc:~/data/
+
+# Resume interrupted transfer
+rsync -avzP --partial /local/data/ user@hpc:~/data/
+
+# Dry run (see what would be transferred)
+rsync -avzPn /local/data/ user@hpc:~/data/
+```
+
+**Flags:**
+- `-a`: Archive mode (preserves permissions, timestamps)
+- `-v`: Verbose
+- `-z`: Compress during transfer
+- `-P`: Show progress and keep partial files
+- `--partial`: Resume interrupted transfers
+
+---
+
+### Method 2: scp (Simple, one-time transfers)
+```bash
+# File to HPC
+scp /local/file.csv user@hpc.institution.edu:~/data/
+
+# Directory to HPC
+scp -r /local/directory/ user@hpc:~/data/
+
+# File from HPC
+scp user@hpc:~/results/output.csv /local/results/
+
+# Multiple files
+scp user@hpc:~/results/*.csv /local/results/
+```
+
+---
+
+### Method 3: Globus (BEST for HUGE datasets, multi-TB)
+**Use when: Transferring 100GB+, need reliability**
+
+```bash
+# Setup Globus Connect Personal on your machine
+# Setup Globus endpoint on HPC (usually pre-configured)
+# Use web interface: https://www.globus.org/
+
+# Benefits:
+# - Automatic retry on failure
+# - Transfer in background
+# - Very fast for large files
+# - Can schedule transfers
+```
+
+---
+
+### Method 4: SSHFS (Mount HPC as local drive)
+**Use for: Browsing files, small edits, not recommended for large transfers**
+
+```bash
+# Install SSHFS
+# macOS: brew install macfuse sshfs
+# Linux: sudo apt-get install sshfs
+
+# Mount HPC directory
+mkdir ~/hpc_mount
+sshfs user@hpc.institution.edu:/home/user ~/hpc_mount
+
+# Unmount
+umount ~/hpc_mount
+```
+
+---
+
+### Method 5: rclone (Cloud storage integration)
+**Use for: Backing up to cloud, sharing with collaborators**
+
+```bash
+# Install rclone
+# Configure with cloud provider (Google Drive, Dropbox, S3, etc.)
+rclone config
+
+# Sync HPC data to cloud
+rclone sync ~/project/results remote:project_backup
+
+# From cloud to HPC
+rclone sync remote:shared_dataset ~/data/
+```
+
+---
+
+## 4. Data Management Best Practices
+
+### Directory Structure on HPC:
+```
+~/
+├── projects/
+│   ├── project1/
+│   │   ├── scripts/          # Git-tracked
+│   │   ├── data/
+│   │   │   ├── raw/          # Original, read-only
+│   │   │   └── processed/    # Derived data
+│   │   ├── results/
+│   │   └── logs/
+│   └── project2/
+├── software/                  # Custom installations
+├── scratch/                   # Temporary, fast storage
+└── archive/                   # Long-term storage
+```
+
+### Storage Tiers (typical HPC):
+1. **Home directory** (~50-100GB): Code, small files, personal config
+2. **Scratch/work** (1-5TB, purged): Active computation, temporary files
+3. **Project storage** (TB+): Shared data, longer retention
+4. **Archive/tape** (unlimited, slow): Long-term backup
+
+### Data Workflow:
+```bash
+# 1. Upload raw data ONCE
+rsync -avzP /local/raw_data/ hpc:~/project/data/raw/
+
+# 2. Make raw data read-only
+chmod -R a-w ~/project/data/raw/
+
+# 3. Process data in scratch (fast filesystem)
+cp -r ~/project/data/raw/* /scratch/$USER/project/
+# Run processing
+# Move results back
+mv /scratch/$USER/project/processed/* ~/project/data/processed/
+
+# 4. Download only what you need
+rsync -avzP hpc:~/project/results/summary.csv /local/
+
+# 5. Archive completed projects
+tar -czf project1_archive.tar.gz project1/
+mv project1_archive.tar.gz ~/archive/
+```
+
+---
+
+## 5. Complete Recommended Workflow
+
+### Initial Setup:
+```bash
+# 1. Setup SSH config for easy connection
+vim ~/.ssh/config  # Add HPC config
+
+# 2. Generate and add SSH key to GitHub
+ssh-keygen -t ed25519
+cat ~/.ssh/id_ed25519.pub  # Add to GitHub
+
+# 3. Test connection
+ssh hpc
+```
+
+### Daily Development Cycle:
+
+**Option A: VS Code Remote (RECOMMENDED)**
+1. Open VS Code
+2. Connect to HPC via Remote-SSH
+3. Edit code directly on HPC
+4. Test in integrated terminal
+5. Commit and push to GitHub
+6. Submit SLURM jobs
+
+**Option B: Local Development + Sync**
+1. Develop code locally in VS Code/PyCharm
+2. Commit to GitHub
+3. SSH to HPC
+4. Pull changes: `git pull`
+5. Submit jobs
+6. Sync results back: `rsync`
+
+### For Large Data:
+```bash
+# Upload once
+rsync -avzP --partial /local/big_dataset/ hpc:~/data/raw/
+
+# Code changes via Git
+git push  # from local
+ssh hpc
+git pull  # on HPC
+
+# Download only results
+rsync -avzP hpc:~/results/figures/ /local/figures/
+```
+
+---
+
+## 6. Pro Tips
+
+### Persistent Sessions with tmux:
+```bash
+# Start tmux session
+tmux new -s work
+
+# Detach: Ctrl+b, then d
+# Reattach later
+tmux attach -t work
+
+# Lost connection? Your session is still running!
+```
+
+### Quick File Preview:
+```bash
+# First few lines
+head -n 20 data.csv
+
+# Last few lines
+tail -n 20 results.csv
+
+# Count lines
+wc -l data.csv
+
+# Search in files
+grep "error" *.log
+
+# Disk usage
+du -sh */
+```
+
+### Automation Script (~/bin/sync_project.sh):
+```bash
+#!/bin/bash
+PROJECT=$1
+
+# Sync code from GitHub
+cd ~/projects/$PROJECT
+git pull
+
+# Sync results to local
+rsync -avzP hpc:~/projects/$PROJECT/results/ \
+    /local/projects/$PROJECT/results/
+
+echo "Sync complete!"
+```
+
+---
+
+---
+
+## 8. Setting Up MATLAB and R Kernels in JupyterLab
+
+### **MATLAB Kernel Setup**
+
+MATLAB support in Jupyter requires the MATLAB Engine API for Python:
+
+```bash
+# On HPC, activate your jupyter environment
+mamba activate jupyter
+
+# Load MATLAB module
+module load matlab
+
+# Find MATLAB root directory
+matlab -batch "disp(matlabroot)"
+# Example output: /usr/local/MATLAB/R2023b
+
+# Install MATLAB Engine API
+cd /usr/local/MATLAB/R2023b/extern/engines/python  # Use your path
+python setup.py install
+
+# Install Jupyter MATLAB kernel
+pip install jupyter-matlab-proxy
+
+# Verify installation
+jupyter labextension list | grep matlab
+```
+
+#### **Alternative: MATLAB Proxy (Easier, Web-Based)**
+
+This gives you MATLAB interface inside JupyterLab:
+
+```bash
+mamba activate jupyter
+pip install jupyter-matlab-proxy
+
+# Restart Jupyter
+# You'll see a "MATLAB" button in the JupyterLab launcher
+```
+
+#### **If You Need Full MATLAB Kernel (imatlab)**
+
+```bash
+# This requires MATLAB installation permissions
+# May not work on all HPC systems
+
+mamba activate jupyter
+pip install imatlab
+python -mimatlab install
+
+# Verify
+jupyter kernelspec list
+```
+
+---
+
+### **R Kernel Setup (IRkernel)**
+
+This is much easier than MATLAB:
+
+```bash
+# Activate environment
+mamba activate jupyter
+
+# Install R kernel and common packages
+mamba install r-irkernel r-essentials r-tidyverse r-ggplot2 r-data.table
+
+# Verify installation
+jupyter kernelspec list
+# Should show: ir
+
+# Test in Jupyter
+# Create new notebook → Select "R" kernel
+```
+
+#### **Manual R Kernel Installation (if mamba method fails)**
+
+```bash
+# Load R module
+module load r
+
+# Start R
+R
+
+# In R console:
+install.packages('IRkernel')
+IRkernel::installspec(user = TRUE)
+quit()
+
+# Back in bash
+jupyter kernelspec list
+```
+
+---
+
+### **RStudio Server on HPC (Alternative to Jupyter)**
+
+RStudio works better as a separate application. Here's how to set it up:
+
+#### **Option 1: RStudio Server via SLURM Job**
+
+Create `launch_rstudio.sh`:
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=rstudio
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
+#SBATCH --time=08:00:00
+#SBATCH --output=rstudio_%j.out
+#SBATCH --error=rstudio_%j.out
+
+exec 2>&1
+
+NODE=$(hostname -s)
+PORT=8787  # RStudio default port
+PASSWORD=$(openssl rand -base64 15)
+
+# Create temporary config directory
+export RSTUDIO_CONFIG_DIR="${HOME}/.rstudio-${SLURM_JOB_ID}"
+mkdir -p ${RSTUDIO_CONFIG_DIR}
+
+echo "=========================================="
+echo "RSTUDIO SERVER STARTING"
+echo "=========================================="
+echo "Node: $NODE"
+echo "Port: $PORT"
+echo "Password: $PASSWORD"
+echo "Time: $(date)"
+echo "=========================================="
+echo ""
+echo "STEP 1: On your LOCAL machine, run:"
+echo ""
+echo "  ssh -N -L ${PORT}:${NODE}:${PORT} ${USER}@kepler.fullerton.edu"
+echo ""
+echo "STEP 2: Open browser to:"
+echo ""
+echo "  http://localhost:${PORT}"
+echo ""
+echo "STEP 3: Login with:"
+echo "  Username: ${USER}"
+echo "  Password: ${PASSWORD}"
+echo ""
+echo "=========================================="
+echo "Starting RStudio Server..."
+echo "=========================================="
+
+# Load R module
+module load r
+module load rstudio-server  # if available
+
+# Start RStudio Server
+rserver \
+    --www-port=${PORT} \
+    --server-user=${USER} \
+    --auth-none=0 \
+    --auth-pam-helper-path=/usr/lib/rstudio-server/bin/pam-helper \
+    --rsession-config-file=${RSTUDIO_CONFIG_DIR}/rsession.conf
+
+echo ""
+echo "=========================================="
+echo "RStudio Server has ended"
+echo "=========================================="
+
+# Cleanup
+rm -rf ${RSTUDIO_CONFIG_DIR}
+```
+
+#### **Option 2: Check if HPC has Open OnDemand**
+
+Many HPCs provide RStudio via Open OnDemand web interface:
+
+```bash
+# Check if available
+# Look for URLs like: https://ondemand.hpc.institution.edu
+# Usually provides: JupyterLab, RStudio, MATLAB, and more
+# With easy resource selection and no manual tunneling!
+```
+
+---
+
+### **Testing All Kernels**
+
+Create a test script `test_kernels.sh`:
+
+```bash
+#!/bin/bash
+
+echo "Available Jupyter kernels:"
+jupyter kernelspec list
+
+echo ""
+echo "Testing Python kernel:"
+jupyter console --kernel=python3 <<EOF
+import numpy as np
+print(f"NumPy version: {np.__version__}")
+exit()
+EOF
+
+echo ""
+echo "Testing R kernel:"
+jupyter console --kernel=ir <<EOF
+R.version.string
+q()
+EOF
+
+echo ""
+echo "Testing MATLAB kernel (if installed):"
+jupyter console --kernel=matlab <<EOF
+version
+exit
+EOF
+```
+
+---
+
+### **Updated Jupyter Launch Script with All Kernels**
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=jupyter
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
+#SBATCH --time=08:00:00
+#SBATCH --output=jupyter_%j.out
+#SBATCH --error=jupyter_%j.out
+
+exec 2>&1
+
+NODE=$(hostname -s)
+PORT=8888
+HOSTNAME="kepler.fullerton.edu"
+
+echo "=========================================="
+echo "JUPYTER LAB STARTING"
+echo "=========================================="
+echo "Node: $NODE"
+echo "Port: $PORT"
+echo "Time: $(date)"
+echo "=========================================="
+echo ""
+echo "STEP 1: On your LOCAL machine terminal, run:"
+echo ""
+echo "  ssh -N -L ${PORT}:${NODE}:${PORT} ${USER}@${HOSTNAME}"
+echo ""
+echo "Note: Approve Duo 2FA, then leave that terminal open"
+echo ""
+echo "STEP 2: Open browser to:"
+echo ""
+echo "  http://localhost:${PORT}"
+echo ""
+echo "=========================================="
+
+# Load necessary modules
+module load matlab  # if using MATLAB
+module load r       # if R not in mamba env
+
+# Initialize mamba
+source ~/miniforge3/etc/profile.d/conda.sh
+source ~/miniforge3/etc/profile.d/mamba.sh
+mamba activate jupyter
+
+echo "Available kernels:"
+jupyter kernelspec list
+echo ""
+echo "Starting Jupyter Lab..."
+echo "Token will appear below:"
+echo "=========================================="
+echo ""
+
+# Start Jupyter
+jupyter lab --no-browser --port=${PORT} --ip=${NODE}
+
+echo ""
+echo "=========================================="
+echo "Jupyter Lab has ended"
+echo "=========================================="
+```
+
+---
+
+## 9. VSCodium Remote Setup (More Stable than Jupyter)
+
+VSCodium is the open-source version of VS Code without Microsoft telemetry. Setup is nearly identical to VS Code.
+
+### **Installation on Local Machine**
+
+```bash
+# macOS
+brew install vscodium
+
+# Linux (Debian/Ubuntu)
+wget -qO - https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/raw/master/pub.gpg | gpg --dearmor | sudo dd of=/usr/share/keyrings/vscodium-archive-keyring.gpg
+echo 'deb [signed-by=/usr/share/keyrings/vscodium-archive-keyring.gpg] https://download.vscodium.com/debs vscodium main' | sudo tee /etc/apt/sources.list.d/vscodium.list
+sudo apt update && sudo apt install codium
+
+# Windows
+# Download from: https://vscodium.com/
+```
+
+---
+
+### **Setting Up Remote-SSH in VSCodium**
+
+#### **1. Install Extensions**
+
+Open VSCodium and install these extensions:
+
+- **Remote - SSH** (by Microsoft - works in VSCodium)
+- **Remote - SSH: Editing Configuration Files**
+
+```bash
+# Or install via command line
+codium --install-extension ms-vscode-remote.remote-ssh
+```
+
+#### **2. Configure SSH Connection**
+
+Press `F1` or `Ctrl+Shift+P` and select:
+- `Remote-SSH: Open SSH Configuration File`
+
+Add your HPC configuration:
+
+```
+Host kepler
+    HostName kepler.fullerton.edu
+    User your_username
+    IdentityFile ~/.ssh/id_rsa
+    ServerAliveInterval 60
+    ServerAliveCountMax 30
+    TCPKeepAlive yes
+    
+    # For better stability on slow connections
+    Compression yes
+    ServerAliveCountMax 30
+    
+    # Forward X11 if needed for MATLAB GUI
+    ForwardX11 yes
+    ForwardX11Trusted yes
+```
+
+#### **3. Connect to HPC**
+
+- Press `F1` → `Remote-SSH: Connect to Host`
+- Select `kepler`
+- Approve Duo 2FA
+- VSCodium installs server components on HPC (first time only)
+
+---
+
+### **Essential VSCodium Extensions for HPC**
+
+Install these after connecting to HPC:
+
+```bash
+# Python
+codium --install-extension ms-python.python
+codium --install-extension ms-python.vscode-pylance
+
+# R
+codium --install-extension REditorSupport.r
+
+# Julia
+codium --install-extension julialang.language-julia
+
+# MATLAB
+codium --install-extension mathworks.language-matlab
+
+# Jupyter in VSCodium
+codium --install-extension ms-toolsai.jupyter
+
+# SLURM syntax highlighting
+codium --install-extension tojapierr.slurm-syntax
+
+# Git
+codium --install-extension eamodio.gitlens
+```
+
+---
+
+### **Working with Jupyter Notebooks in VSCodium**
+
+VSCodium can open `.ipynb` files directly:
+
+1. Connect to HPC via Remote-SSH
+2. Open any `.ipynb` file
+3. Select kernel (Python, R, Julia, MATLAB if configured)
+4. Run cells interactively
+
+**Advantages over browser-based Jupyter:**
+- No SSH tunnel needed
+- More stable connection
+- Integrated git
+- Better code completion
+- Can edit multiple files simultaneously
+
+---
+
+### **Running Interactive Python/R/MATLAB in VSCodium**
+
+#### **Python Interactive Window**
+
+```python
+# In any .py file, add: # %%
+# This creates a cell like Jupyter
+
+# %%
+import numpy as np
+x = np.random.rand(100)
+print(x.mean())
+
+# %%
+import matplotlib.pyplot as plt
+plt.plot(x)
+plt.show()
+
+# Press Shift+Enter to run cell
+# Results appear in Interactive Window
+```
+
+#### **R Interactive Window**
+
+Install the R extension, then:
+
+```r
+# In any .R file
+x <- rnorm(100)
+mean(x)
+
+# Ctrl+Enter to send to R terminal
+```
+
+#### **MATLAB Scripts**
+
+```matlab
+% In any .m file
+x = rand(100, 1);
+mean(x)
+
+% Run with F5 or right-click → Run
+```
+
+---
+
+### **Preventing Disconnections**
+
+#### **Method 1: Use tmux on HPC (BEST)**
+
+```bash
+# After connecting via VSCodium's terminal:
+tmux new -s dev
+
+# Now work normally
+# If connection drops, reconnect and:
+tmux attach -s dev
+# Your session is exactly as you left it!
+```
+
+#### **Method 2: Better SSH Settings**
+
+In `~/.ssh/config` on your LOCAL machine:
+
+```
+Host kepler
+    HostName kepler.fullerton.edu
+    User your_username
+    IdentityFile ~/.ssh/id_rsa
+    
+    # Keep connection alive
+    ServerAliveInterval 30
+    ServerAliveCountMax 120
+    TCPKeepAlive yes
+    
+    # Reuse connections (faster reconnection)
+    ControlMaster auto
+    ControlPath ~/.ssh/control-%r@%h:%p
+    ControlPersist 10m
+    
+    # Compression for slow connections
+    Compression yes
+```
+
+#### **Method 3: VSCodium Settings**
+
+In VSCodium settings (`Ctrl+,`), search for "remote" and set:
+
+```json
+{
+    "remote.SSH.connectTimeout": 60,
+    "remote.SSH.keepAlive": true,
+    "remote.SSH.maxReconnectionAttempts": 10,
+    "remote.autoForwardPorts": false
+}
+```
+
+---
+
+### **Comparison: JupyterLab vs VSCodium**
+
+| Feature | JupyterLab | VSCodium |
+|---------|------------|----------|
+| **Stability** | ⚠️ Disconnects on network issues | ✅ Auto-reconnects |
+| **Setup** | SSH tunnel required | Direct SSH connection |
+| **Notebooks** | ✅ Native `.ipynb` support | ✅ Native `.ipynb` support |
+| **Code editing** | ⚠️ Basic editor | ✅ Full IDE features |
+| **Git integration** | ⚠️ Limited | ✅ Excellent |
+| **Multi-file** | ⚠️ Tabs only | ✅ Split panes, multiple windows |
+| **Debugging** | ⚠️ Limited | ✅ Full debugger |
+| **Terminal** | ✅ Integrated | ✅ Integrated |
+| **R Support** | ✅ IRkernel | ✅ Native R extension |
+| **MATLAB Support** | ⚠️ Via proxy | ✅ Native MATLAB extension |
+
+**Recommendation:** Use VSCodium as primary IDE, launch JupyterLab only when you need its specific notebook features.
+
+---
+
+### **Complete Workflow with VSCodium**
+
+```bash
+# 1. Connect to HPC in VSCodium (F1 → Remote-SSH: Connect)
+# 2. Open integrated terminal
+# 3. Start tmux for persistence
+tmux new -s work
+
+# 4. Activate your environment
+mamba activate jupyter
+
+# 5. Work on your files directly in VSCodium
+# 6. Run code interactively with Shift+Enter
+# 7. Submit SLURM jobs from terminal
+sbatch my_job.sh
+
+# 8. If connection drops:
+# - Reconnect in VSCodium
+# - Open terminal
+tmux attach -s work
+# - Continue exactly where you left off!
+```
+
+---
+
+### **Quick Setup Script**
+
+Save as `~/setup_remote_dev.sh` on HPC:
+
+```bash
+#!/bin/bash
+
+echo "Setting up remote development environment..."
+
+# Install tmux if not available
+module load tmux  # or: sudo apt-get install tmux
+
+# Create tmux config for better experience
+cat > ~/.tmux.conf << 'EOF'
+# Better prefix
+set -g prefix C-a
+unbind C-b
+
+# Mouse support
+set -g mouse on
+
+# Better colors
+set -g default-terminal "screen-256color"
+
+# Status bar
+set -g status-style bg=colour235,fg=colour136
+EOF
+
+echo "Checking Jupyter kernels..."
+mamba activate jupyter
+jupyter kernelspec list
+
+echo ""
+echo "Setup complete!"
+echo "Connect with VSCodium Remote-SSH to get started"
+```
+
+---
+
+## 10. Troubleshooting Remote Connections
+
+### **Jupyter Disconnects**
+
+```bash
+# Increase timeout in jupyter config
+mkdir -p ~/.jupyter
+cat >> ~/.jupyter/jupyter_lab_config.py << EOF
+c.ServerApp.tornado_settings = {
+    'headers': {
+        'Content-Security-Policy': "frame-ancestors 'self' "
+    }
+}
+c.ServerApp.shutdown_no_activity_timeout = 0
+c.MappingKernelManager.cull_idle_timeout = 0
+EOF
+```
+
+### **VSCodium Won't Connect**
+
+```bash
+# On HPC, remove old server
+rm -rf ~/.vscode-server
+
+# Reconnect from VSCodium
+```
+
+### **MATLAB Kernel Issues**
+
+```bash
+# Check MATLAB is accessible
+module load matlab
+matlab -batch "disp('MATLAB works')"
+
+# Check Python can find MATLAB
+python -c "import matlab.engine; print('MATLAB Engine OK')"
+```
+
+---
+
+### Connection Issues:
+```bash
+# Test connection
+ssh -v hpc
+
+# Check for stale connections
+rm ~/.ssh/known_hosts  # If host key changed
+
+# VS Code won't connect
+# Delete: ~/.vscode-server/ on HPC
+```
+
+### Transfer Issues:
+```bash
+# Check disk space on HPC
+df -h ~
+
+# Check quota
+quota -s
+
+# Find large files
+du -ah ~ | sort -rh | head -20
+```
+
+---
+
+## Summary: Best Setup
+
+**For most users:**
+- **Code**: VS Code with Remote-SSH extension
+- **Version control**: GitHub for code only
+- **Data transfer**: rsync for datasets, Globus for 100GB+
+- **Interactive work**: JupyterLab with SSH tunnel
+- **Persistence**: tmux for long-running sessions
+
+**File strategy:**
+- Git: Scripts, notebooks, configs
+- rsync: Raw data (once), results (as needed)
+- Never commit: Data files, model checkpoints, job outputs
+
+This setup gives you a modern IDE experience while working efficiently with HPC resources!

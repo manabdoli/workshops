@@ -1,0 +1,260 @@
+---
+title: "Automating HPC-Output Review"
+format: 
+  html:
+    toc: true
+    toc_float: true
+---
+
+VSCodium (and VS Code) can be picky about SSH key detection. Let's fix this:
+
+## **Solution 1: Add Key to SSH Agent (RECOMMENDED)**
+
+```bash
+# On your LOCAL machine
+
+# Start SSH agent (if not running)
+eval "$(ssh-agent -s)"
+
+# Add your specific key
+ssh-add ~/.ssh/mu_id
+
+# Verify it's added
+ssh-add -l
+
+# Test connection
+ssh kepler
+# Should work now
+
+# Now VSCodium will use the key from the agent
+```
+
+Make this permanent by adding to `~/.bash_profile` or `~/.zshrc`:
+
+```bash
+# Add to ~/.bash_profile (or ~/.zshrc on macOS)
+if [ -z "$SSH_AUTH_SOCK" ]; then
+   eval "$(ssh-agent -s)"
+   ssh-add ~/.ssh/mu_id 2>/dev/null
+fi
+```
+
+---
+
+## **Solution 2: Fix SSH Config Syntax**
+
+The config file is very particular about spacing and key file paths:
+
+```bash
+# Edit ~/.ssh/config on LOCAL machine
+nano ~/.ssh/config
+```
+
+Make sure it looks EXACTLY like this (spacing matters):
+
+```
+Host kepler
+    HostName kepler.fullerton.edu
+    User your_username
+    IdentityFile ~/.ssh/mu_id
+    IdentitiesOnly yes
+    ServerAliveInterval 60
+    ServerAliveCountMax 30
+    TCPKeepAlive yes
+    Compression yes
+```
+
+**Key points:**
+- `IdentitiesOnly yes` - Forces SSH to ONLY use the specified key
+- No quotes around the path
+- Use full path if `~` doesn't work: `/Users/yourusername/.ssh/mu_id`
+
+---
+
+## **Solution 3: Check File Permissions**
+
+SSH is strict about key file permissions:
+
+```bash
+# On LOCAL machine
+chmod 600 ~/.ssh/mu_id
+chmod 644 ~/.ssh/mu_id.pub
+chmod 700 ~/.ssh
+```
+
+---
+
+## **Solution 4: Test SSH Config is Being Read**
+
+```bash
+# On LOCAL machine, test with verbose output
+ssh -vvv kepler 2>&1 | grep -i "identity file"
+
+# You should see:
+# debug1: identity file ~/.ssh/mu_id type 0
+# debug1: Offering public key: ~/.ssh/mu_id RSA...
+
+# If you see "id_rsa" mentioned, the config isn't being read
+```
+
+---
+
+## **Solution 5: Specify Key in VSCodium Settings**
+
+VSCodium can specify the SSH command directly:
+
+1. Open VSCodium
+2. Press `F1` → `Preferences: Open Settings (JSON)`
+3. Add:
+
+```json
+{
+    "remote.SSH.configFile": "~/.ssh/config",
+    "remote.SSH.defaultExtensions": [],
+    "remote.SSH.enableAgentForwarding": true,
+    "remote.SSH.useLocalServer": true,
+    "remote.SSH.path": "ssh"
+}
+```
+
+---
+
+## **Solution 6: Create Host-Specific Command**
+
+If all else fails, tell VSCodium to use a specific SSH command:
+
+In `~/.ssh/config`:
+
+```
+Host kepler
+    HostName kepler.fullerton.edu
+    User your_username
+    IdentityFile ~/.ssh/mu_id
+    IdentitiesOnly yes
+```
+
+Then in VSCodium, when connecting:
+- `F1` → `Remote-SSH: Connect to Host`
+- Instead of selecting `kepler`, choose `Add New SSH Host`
+- Enter: `ssh -i ~/.ssh/mu_id your_username@kepler.fullerton.edu`
+
+---
+
+## **Debugging Steps**
+
+Try these in order:
+
+```bash
+# 1. Verify SSH config syntax
+cat ~/.ssh/config | grep -A 10 "Host kepler"
+
+# 2. Test if regular SSH uses correct key
+ssh -v kepler 2>&1 | grep "Offering public key"
+# Should show: ~/.ssh/mu_id
+
+# 3. Test with explicit key specification
+ssh -i ~/.ssh/mu_id kepler
+# Does this work?
+
+# 4. Check if key is in agent
+ssh-add -l
+# Should list your mu_id key
+
+# 5. Test VSCodium's SSH
+# Look at VSCodium's output panel:
+# View → Output → Select "Remote - SSH" from dropdown
+# This shows what SSH command VSCodium is actually running
+```
+
+---
+
+## **Complete Working Example**
+
+Here's what should work:
+
+```bash
+# On LOCAL machine
+
+# 1. Ensure correct permissions
+chmod 600 ~/.ssh/mu_id
+chmod 644 ~/.ssh/mu_id.pub
+
+# 2. Add to SSH agent
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/mu_id
+
+# 3. Update ~/.ssh/config
+cat > ~/.ssh/config << 'EOF'
+Host kepler
+    HostName kepler.fullerton.edu
+    User your_username
+    IdentityFile ~/.ssh/mu_id
+    IdentitiesOnly yes
+    ServerAliveInterval 60
+    ServerAliveCountMax 30
+    PreferredAuthentications publickey,keyboard-interactive
+EOF
+
+# 4. Test
+ssh kepler
+# Should work with your 2FA
+
+# 5. Now connect in VSCodium
+# F1 → Remote-SSH: Connect to Host → kepler
+```
+
+---
+
+## **If VSCodium Still Looks for id_rsa**
+
+VSCodium might be caching the connection. Clear it:
+
+```bash
+# On LOCAL machine
+
+# 1. Remove VSCodium's SSH cache
+rm -rf ~/.vscode-oss/extensions/ms-vscode-remote.remote-ssh-*/
+# or for standard VS Code:
+rm -rf ~/.vscode/extensions/ms-vscode-remote.remote-ssh-*/
+
+# 2. Remove connection cache
+rm -rf ~/.ssh/control-*
+
+# 3. Restart VSCodium completely
+
+# 4. Try connecting again
+```
+
+---
+
+## **Alternative: Create a Wrapper Script**
+
+If nothing else works, create a wrapper:
+
+```bash
+# Create ~/bin/ssh-kepler
+mkdir -p ~/bin
+cat > ~/bin/ssh-kepler << 'EOF'
+#!/bin/bash
+ssh -i ~/.ssh/mu_id "$@"
+EOF
+
+chmod +x ~/bin/ssh-kepler
+```
+
+Then in VSCodium settings:
+```json
+{
+    "remote.SSH.path": "/Users/yourusername/bin/ssh-kepler"
+}
+```
+
+---
+
+**What's your current status?**
+
+1. Does `ssh kepler` work from terminal after adding key to agent?
+2. When you run `ssh -v kepler`, do you see it trying `mu_id` or `id_rsa`?
+3. What error do you see in VSCodium's Output panel (View → Output → Remote - SSH)?
+
+Let me know and I can help troubleshoot further!
